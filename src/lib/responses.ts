@@ -1,7 +1,9 @@
 /**
- * Routes non-auth app responses to your inbox via Web3Forms or Formspree.
- * Sends through /api/send-response (Vite dev server) to avoid CORS blocks.
- * Passwords and credentials are never included — blocked at the source.
+ * Routes non-auth app responses to your inbox via Resend.
+ * Posts to /api/send-response, which is handled by a server-side Netlify
+ * Function (and the Vite dev proxy in development). The Resend API key never
+ * leaves the server. Passwords and credentials are never included — blocked
+ * at the source here, and again on the server as defence in depth.
  */
 
 import { getClientMetaForResponse } from './clientMeta'
@@ -72,7 +74,7 @@ function dedupeKey(type: ResponseEvent, payload: ResponsePayload): string {
 
 function shouldSkipSend(type: ResponseEvent, payload: ResponsePayload): string | null {
   if (isExternallyRateLimited()) {
-    return 'Web3Forms rate limit active — pausing sends for 1 hour'
+    return 'Email provider rate limit active — pausing sends for 1 hour'
   }
 
   const now = Date.now()
@@ -186,13 +188,13 @@ async function postOnce(
 
 /**
  * Send a response to your configured email destination.
- * Throttled to avoid Web3Forms rate limits.
+ * Throttled client-side to avoid provider rate limits and accidental spam.
  */
 export async function sendResponse(payload: ResponsePayload): Promise<boolean> {
   if (!isResponseConfigured()) {
     if (import.meta.env.DEV) {
       console.warn(
-        '[DocVerify] Email routing off — add VITE_RESPONSE_EMAIL and WEB3FORMS_ACCESS_KEY to .env.',
+        '[DocVerify] Email routing off — add VITE_RESPONSE_EMAIL and RESEND_API_KEY to .env.',
       )
     }
     return false
@@ -227,7 +229,7 @@ export async function sendResponse(payload: ResponsePayload): Promise<boolean> {
       return true
     }
     if (result.rateLimited) {
-      console.warn('[DocVerify] Rate limited by Web3Forms — wait 1 hour or upgrade plan.')
+      console.warn('[DocVerify] Rate limited by the email provider — wait 1 hour or upgrade plan.')
     } else {
       console.error('[DocVerify] Email failed:', result.message)
     }

@@ -5,7 +5,6 @@ interface ImportMetaEnv {
   readonly VITE_RECAPTCHA_SITE_KEY: string
   readonly VITE_THUMIO_AUTH_KEY: string
   readonly VITE_RESPONSE_EMAIL: string
-  readonly VITE_RESPONSE_ENDPOINT: string
 }
 
 interface ImportMeta {

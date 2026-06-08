@@ -104,7 +104,13 @@ function apiPlugin(env: Record<string, string>): Plugin {
             } else if (web3formsKey && !web3formsKey.startsWith('your-')) {
               upstream = await fetch('https://api.web3forms.com/submit', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                headers: {
+                  'Content-Type': 'application/json',
+                  Accept: 'application/json',
+                  // Datacenter requests without a browser-like UA get a Cloudflare 403 challenge.
+                  'User-Agent':
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                },
                 body: JSON.stringify({
                   access_key: web3formsKey,
                   subject,

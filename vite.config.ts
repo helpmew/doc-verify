@@ -156,8 +156,10 @@ function apiPlugin(env: Record<string, string>): Plugin {
           }
 
           next()
-        } catch {
-          jsonResponse(res, 500, { success: false, message: 'Server error' })
+        } catch (err) {
+          const detail = err instanceof Error ? err.message : String(err)
+          console.error('[docverify-api] request failed:', err)
+          jsonResponse(res, 500, { success: false, message: `Server error: ${detail}` })
         }
       })
     },

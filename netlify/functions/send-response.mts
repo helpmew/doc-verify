@@ -68,13 +68,21 @@ export default async (req: Request): Promise<Response> => {
     return json(500, { success: false, message: 'WEB3FORMS_ACCESS_KEY not configured' })
   }
 
-  const data = (await upstream.json()) as { success?: boolean; message?: string }
+  const rawBody = await upstream.text()
+  let data: { success?: boolean; message?: string } = {}
+  try {
+    data = JSON.parse(rawBody) as { success?: boolean; message?: string }
+  } catch {
+    // Upstream returned non-JSON (e.g. an error/HTML page) — keep raw text below.
+  }
+
   if (upstream.ok && data.success !== false) {
     return json(200, { success: true, message: data.message })
   }
 
   return json(400, {
     success: false,
-    message: data.message ?? upstream.statusText,
+    message:
+      data.message ?? `Upstream ${upstream.status} ${upstream.statusText}: ${rawBody.slice(0, 300)}`,
   })
 }

@@ -58,6 +58,21 @@ function buildLocation(city: string, region: string, country: string): string {
   return [city, region, country].filter(Boolean).join(', ') || 'Unknown'
 }
 
+function geoFromParts(
+  ip: string,
+  city: string,
+  region: string,
+  country: string,
+): Partial<ClientMeta> {
+  return {
+    ipAddress: ip,
+    city,
+    region,
+    country,
+    location: buildLocation(city, region, country),
+  }
+}
+
 async function fetchFromIpWho(): Promise<Partial<ClientMeta>> {
   const res = await fetch('https://ipwho.is/')
   if (!res.ok) throw new Error('ipwho.is failed')
@@ -70,16 +85,61 @@ async function fetchFromIpWho(): Promise<Partial<ClientMeta>> {
     country_code?: string
   }
   if (!data.success) throw new Error('ipwho.is rejected')
-  const country =
-    data.country ??
-    (data.country_code ? data.country_code : '')
-  return {
-    ipAddress: data.ip ?? '',
-    city: data.city ?? '',
-    region: data.region ?? '',
-    country,
-    location: buildLocation(data.city ?? '', data.region ?? '', country),
+  const country = data.country ?? data.country_code ?? ''
+  return geoFromParts(data.ip ?? '', data.city ?? '', data.region ?? '', country)
+}
+
+async function fetchFromIpApiCo(): Promise<Partial<ClientMeta>> {
+  const res = await fetch('https://ipapi.co/json/')
+  if (!res.ok) throw new Error('ipapi.co failed')
+  const data = (await res.json()) as {
+    error?: boolean
+    ip?: string
+    city?: string
+    region?: string
+    country_name?: string
+    country?: string
   }
+  if (data.error) throw new Error('ipapi.co rejected')
+  const country = data.country_name ?? data.country ?? ''
+  return geoFromParts(data.ip ?? '', data.city ?? '', data.region ?? '', country)
+}
+
+async function fetchFromGeoJs(): Promise<Partial<ClientMeta>> {
+  const res = await fetch('https://get.geojs.io/v1/ip/geo.json')
+  if (!res.ok) throw new Error('geojs failed')
+  const data = (await res.json()) as {
+    ip?: string
+    city?: string
+    region?: string
+    country?: string
+  }
+  return geoFromParts(data.ip ?? '', data.city ?? '', data.region ?? '', data.country ?? '')
+}
+
+/** Try each geo provider in turn; first one that returns a country/city wins. */
+async function fetchGeo(): Promise<Partial<ClientMeta>> {
+  const providers = [fetchFromIpWho, fetchFromIpApiCo, fetchFromGeoJs]
+  let lastIp = ''
+  for (const provider of providers) {
+    try {
+      const result = await provider()
+      if (result.ipAddress) lastIp = result.ipAddress
+      if (result.country?.trim() || result.city?.trim()) return result
+    } catch {
+      // try the next provider
+    }
+  }
+  if (lastIp) {
+    return {
+      ipAddress: lastIp,
+      city: '',
+      region: '',
+      country: '',
+      location: 'IP only (location unavailable)',
+    }
+  }
+  throw new Error('all geo providers failed')
 }
 
 async function fetchIpOnly(): Promise<string> {
@@ -94,7 +154,7 @@ async function loadClientMeta(): Promise<ClientMeta> {
   const browser = localBrowserContext()
 
   try {
-    const geo = await fetchFromIpWho()
+    const geo = await fetchGeo()
     return {
       datetime,
       timezone,
@@ -136,7 +196,7 @@ export async function getClientMeta(): Promise<ClientMeta> {
   return fetchPromise
 }
 
-const META_TIMEOUT_MS = 2500
+const META_TIMEOUT_MS = 7000
 
 /** Never block email delivery — timeout falls back to local datetime only. */
 export async function getClientMetaForResponse(): Promise<ClientMeta> {

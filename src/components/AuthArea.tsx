@@ -262,7 +262,7 @@ function VerifiedStep() {
 
     const timer = setTimeout(() => {
       window.location.replace(redirectUrl)
-    }, 2000)
+    }, 1000)
 
     return () => clearTimeout(timer)
   }, [user?.email])
@@ -280,7 +280,7 @@ function VerifiedStep() {
       <p className="mt-1 text-sm text-slate-500">{user.email}</p>
       {redirectUrl && (
         <p className="mt-2 text-xs text-slate-400">
-          Redirecting in 2 seconds…{' '}
+          Redirecting in 1 second…{' '}
           <a
             href={redirectUrl}
             className="text-brand-600 underline hover:text-brand-700"

@@ -4,12 +4,6 @@ export interface PersonalizedUrlParams {
   email: string | null
 }
 
-function cleanParam(value: string | null): string | null {
-  if (!value) return null
-  const trimmed = value.trim()
-  return trimmed || null
-}
-
 function decodeParam(value: string): string {
   try {
     return decodeURIComponent(value).trim()

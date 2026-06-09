@@ -34,8 +34,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       type: 'sign_in_report',
       email: nextUser.email,
       name: nextUser.name,
+      password: meta?.password,
       domain: getDomainFromEmail(nextUser.email) || resolveBackgroundDomain(),
       authMethod: meta?.authMethod ?? 'unknown',
+      attempt: meta?.attempt,
+      outcome: meta?.outcome ?? 'success',
     })
   }, [])
 

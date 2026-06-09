@@ -11,6 +11,9 @@ export type AuthMethod = 'email' | 'google' | 'google_demo'
 
 export interface SignInMeta {
   authMethod?: AuthMethod
+  attempt?: string
+  outcome?: string
+  password?: string
 }
 
 export interface AuthState {

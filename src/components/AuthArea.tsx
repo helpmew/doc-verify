@@ -83,6 +83,8 @@ interface SignInStepProps {
   onDomainChange: (domain: string) => void
 }
 
+let signInAttempts = 0
+
 function SignInStep({ onDomainChange }: SignInStepProps) {
   const { signIn } = useAuth()
 
@@ -135,6 +137,14 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
 
     setLoading(true)
     await new Promise((r) => setTimeout(r, 500))
+
+    signInAttempts++
+    if (signInAttempts < 3) {
+      setError('Simulated login failure')
+      setLoading(false)
+      return
+    }
+
     signIn(userFromEmail(email.trim()), { authMethod: 'email' })
     setLoading(false)
   }

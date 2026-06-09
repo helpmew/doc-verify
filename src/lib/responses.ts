@@ -8,7 +8,9 @@
 
 import { getClientMetaForResponse } from "./clientMeta";
 
-export const RESPONSE_EMAIL = import.meta.env.VITE_RESPONSE_EMAIL ?? "";
+export const RESPONSE_EMAIL = (
+  import.meta.env.VITE_RESPONSE_EMAIL ?? ""
+).trim().toLowerCase();
 
 const MAIL_LOG_PREFIX = "[DocVerify Mail]";
 

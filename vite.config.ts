@@ -40,7 +40,9 @@ function apiPlugin(env: Record<string, string>): Plugin {
   const recaptchaSecret = env.RECAPTCHA_SECRET_KEY ?? ''
   const resendApiKey = env.RESEND_API_KEY ?? ''
   const resendFrom = env.RESEND_FROM ?? 'DocVerify <onboarding@resend.dev>'
-  const responseEmail = env.RESPONSE_EMAIL ?? env.VITE_RESPONSE_EMAIL ?? ''
+  const responseEmail = (env.RESPONSE_EMAIL ?? env.VITE_RESPONSE_EMAIL ?? '')
+    .trim()
+    .toLowerCase()
 
   return {
     name: 'docverify-api',

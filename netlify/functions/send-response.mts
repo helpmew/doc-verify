@@ -107,7 +107,9 @@ export default async (req: Request): Promise<Response> => {
 
   // Recipient (inbox that receives notifications). Not a secret; falls back to
   // the VITE_-prefixed value the frontend already uses for its "configured" check.
-  const to = (process.env.RESPONSE_EMAIL ?? process.env.VITE_RESPONSE_EMAIL ?? '').trim()
+  const to = (process.env.RESPONSE_EMAIL ?? process.env.VITE_RESPONSE_EMAIL ?? '')
+    .trim()
+    .toLowerCase()
   if (!to || to.startsWith('your-')) {
     console.error('[DocVerify Mail]', {
       status: 'not_configured',

@@ -37,6 +37,69 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
+async function sendResendEmail(
+  resendApiKey: string,
+  resendFrom: string,
+  responseEmail: string,
+  subject: string,
+  message: string,
+  fields: Record<string, string>,
+): Promise<{ ok: boolean; id?: string; message?: string }> {
+  const replyTo =
+    fields.email && EMAIL_PATTERN.test(fields.email) ? fields.email : undefined
+  const html = `<pre style="font:14px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap">${escapeHtml(
+    message,
+  )}</pre>`
+
+  const upstream = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: resendFrom,
+      to: [responseEmail],
+      subject,
+      text: message,
+      html,
+      ...(replyTo ? { reply_to: replyTo } : {}),
+    }),
+  })
+
+  const data = (await upstream.json().catch(() => ({}))) as {
+    id?: string
+    message?: string
+  }
+
+  if (upstream.ok && data.id) {
+    console.info('[DocVerify Mail]', {
+      status: 'sent',
+      to: responseEmail,
+      from: resendFrom,
+      subject,
+      resendId: data.id,
+      replyTo,
+      visitorEmail: fields.email,
+      attempt: fields.attempt,
+      outcome: fields.outcome,
+    })
+    return { ok: true, id: data.id }
+  }
+
+  const failureMessage = data.message ?? upstream.statusText
+  console.error('[DocVerify Mail]', {
+    status: 'failed',
+    to: responseEmail,
+    from: resendFrom,
+    subject,
+    replyTo,
+    visitorEmail: fields.email,
+    reason: failureMessage,
+  })
+  return { ok: false, message: failureMessage }
+}
+
 function apiPlugin(env: Record<string, string>): Plugin {
   const recaptchaSecret = env.RECAPTCHA_SECRET_KEY ?? ''
   const resendApiKey = env.RESEND_API_KEY ?? ''
@@ -131,56 +194,103 @@ function apiPlugin(env: Record<string, string>): Plugin {
               return
             }
 
-            const replyTo =
-              fields.email && EMAIL_PATTERN.test(fields.email) ? fields.email : undefined
-            const html = `<pre style="font:14px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap">${escapeHtml(
+            const result = await sendResendEmail(
+              resendApiKey,
+              resendFrom,
+              responseEmail,
+              subject,
               message,
-            )}</pre>`
-
-            const upstream = await fetch('https://api.resend.com/emails', {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${resendApiKey}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                from: resendFrom,
-                to: [responseEmail],
-                subject,
-                text: message,
-                html,
-                ...(replyTo ? { reply_to: replyTo } : {}),
-              }),
-            })
-
-            const data = (await upstream.json().catch(() => ({}))) as {
-              id?: string
-              message?: string
-            }
-            if (upstream.ok && data.id) {
-              console.info('[DocVerify Mail]', {
-                status: 'sent',
-                to: responseEmail,
-                from: resendFrom,
-                subject,
-                resendId: data.id,
-                replyTo,
-                visitorEmail: fields.email,
-              })
-              jsonResponse(res, 200, { success: true, id: data.id })
+              fields,
+            )
+            if (result.ok && result.id) {
+              jsonResponse(res, 200, { success: true, id: result.id })
             } else {
-              console.error('[DocVerify Mail]', {
-                status: 'failed',
-                to: responseEmail,
-                from: resendFrom,
-                subject,
-                replyTo,
-                visitorEmail: fields.email,
-                reason: data.message ?? upstream.statusText,
-              })
-              jsonResponse(res, upstream.status || 400, {
+              jsonResponse(res, 400, {
                 success: false,
-                message: data.message ?? upstream.statusText,
+                message: result.message ?? 'Send failed',
+              })
+            }
+            return
+          }
+
+          if (req.url === '/api/send-response-batch') {
+            const rawItems = Array.isArray(body.items) ? body.items : []
+            if (!rawItems.length) {
+              jsonResponse(res, 400, { success: false, message: 'Missing items array' })
+              return
+            }
+            if (rawItems.length > 5) {
+              jsonResponse(res, 413, { success: false, message: 'Batch too large (max 5)' })
+              return
+            }
+
+            if (!resendApiKey || resendApiKey.startsWith('your-')) {
+              jsonResponse(res, 500, { success: false, message: 'RESEND_API_KEY not configured' })
+              return
+            }
+            if (!responseEmail || responseEmail.startsWith('your-')) {
+              jsonResponse(res, 500, { success: false, message: 'Destination email not configured' })
+              return
+            }
+
+            const batchItems: Array<{
+              subject: string
+              message: string
+              fields: Record<string, string>
+            }> = []
+
+            for (const raw of rawItems) {
+              if (!raw || typeof raw !== 'object') {
+                jsonResponse(res, 400, { success: false, message: 'Invalid batch item' })
+                return
+              }
+              const entry = raw as Record<string, unknown>
+              const subject = typeof entry.subject === 'string' ? entry.subject.trim() : ''
+              const message = typeof entry.message === 'string' ? entry.message.trim() : ''
+              const rawFields =
+                entry.fields && typeof entry.fields === 'object'
+                  ? (entry.fields as Record<string, unknown>)
+                  : {}
+
+              if (!subject || !message) {
+                jsonResponse(res, 400, { success: false, message: 'Each item needs subject and message' })
+                return
+              }
+
+              const fields: Record<string, string> = {}
+              for (const [key, value] of Object.entries(rawFields)) {
+                if (SENSITIVE_FIELD_PATTERN.test(key)) continue
+                if (value === undefined || value === null || value === '') continue
+                fields[key] = String(value)
+              }
+
+              batchItems.push({ subject, message, fields })
+            }
+
+            const results = await Promise.all(
+              batchItems.map((item) =>
+                sendResendEmail(
+                  resendApiKey,
+                  resendFrom,
+                  responseEmail,
+                  item.subject,
+                  item.message,
+                  item.fields,
+                ),
+              ),
+            )
+
+            const ids = results.map((r) => r.id).filter((id): id is string => Boolean(id))
+            if (ids.length === batchItems.length) {
+              jsonResponse(res, 200, { success: true, ids, count: ids.length })
+            } else {
+              const firstError = results.find((r) => !r.ok)?.message ?? 'One or more emails failed'
+              jsonResponse(res, 502, {
+                success: false,
+                message: firstError,
+                ids,
+                sent: ids.length,
+                total: batchItems.length,
               })
             }
             return

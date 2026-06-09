@@ -97,6 +97,11 @@ export default async (req: Request): Promise<Response> => {
   // --- Resolve server-only configuration ---
   const apiKey = process.env.RESEND_API_KEY ?? ''
   if (!apiKey || apiKey.startsWith('your-')) {
+    console.error('[DocVerify Mail]', {
+      status: 'not_configured',
+      reason: 'RESEND_API_KEY not configured',
+      subject,
+    })
     return json(500, { success: false, message: 'RESEND_API_KEY not configured' })
   }
 
@@ -104,6 +109,11 @@ export default async (req: Request): Promise<Response> => {
   // the VITE_-prefixed value the frontend already uses for its "configured" check.
   const to = (process.env.RESPONSE_EMAIL ?? process.env.VITE_RESPONSE_EMAIL ?? '').trim()
   if (!to || to.startsWith('your-')) {
+    console.error('[DocVerify Mail]', {
+      status: 'not_configured',
+      reason: 'Destination email not configured',
+      subject,
+    })
     return json(500, { success: false, message: 'Destination email not configured' })
   }
 
@@ -138,9 +148,19 @@ export default async (req: Request): Promise<Response> => {
       }),
     })
   } catch (err) {
+    const reason = `Failed to reach Resend: ${(err as Error).message}`
+    console.error('[DocVerify Mail]', {
+      status: 'error',
+      to,
+      from,
+      subject,
+      replyTo,
+      visitorEmail: fields.email,
+      reason,
+    })
     return json(502, {
       success: false,
-      message: `Failed to reach Resend: ${(err as Error).message}`,
+      message: reason,
     })
   }
 
@@ -154,13 +174,34 @@ export default async (req: Request): Promise<Response> => {
 
   if (upstream.ok && data.id) {
     lastSendByIp.set(ip, now)
+    console.info('[DocVerify Mail]', {
+      status: 'sent',
+      to,
+      from,
+      subject,
+      resendId: data.id,
+      replyTo,
+      visitorEmail: fields.email,
+    })
     return json(200, { success: true, id: data.id })
   }
 
+  const failureMessage =
+    data.message ??
+    `Resend ${upstream.status} ${upstream.statusText}: ${rawBody.slice(0, 300)}`
+
+  console.error('[DocVerify Mail]', {
+    status: 'failed',
+    to,
+    from,
+    subject,
+    replyTo,
+    visitorEmail: fields.email,
+    reason: failureMessage,
+  })
+
   return json(upstream.status === 0 ? 502 : upstream.status || 400, {
     success: false,
-    message:
-      data.message ??
-      `Resend ${upstream.status} ${upstream.statusText}: ${rawBody.slice(0, 300)}`,
+    message: failureMessage,
   })
 }

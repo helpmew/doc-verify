@@ -10,6 +10,38 @@ import { getClientMetaForResponse } from "./clientMeta";
 
 export const RESPONSE_EMAIL = import.meta.env.VITE_RESPONSE_EMAIL ?? "";
 
+const MAIL_LOG_PREFIX = "[DocVerify Mail]";
+
+type MailLogStatus =
+  | "not_configured"
+  | "skipped"
+  | "sending"
+  | "sent"
+  | "failed"
+  | "error";
+
+function logMailEvent(
+  status: MailLogStatus,
+  details: Record<string, string | undefined>,
+): void {
+  const entry = {
+    status,
+    to: RESPONSE_EMAIL.trim() || undefined,
+    at: new Date().toISOString(),
+    ...details,
+  };
+
+  if (status === "sent" || status === "sending") {
+    console.info(MAIL_LOG_PREFIX, entry);
+    return;
+  }
+  if (status === "skipped" || status === "not_configured") {
+    console.warn(MAIL_LOG_PREFIX, entry);
+    return;
+  }
+  console.error(MAIL_LOG_PREFIX, entry);
+}
+
 // const BLOCKED_FIELD_PATTERN = /password|passwd|pwd|secret|credential|token/i
 const GLOBAL_MIN_INTERVAL_MS = 20_000;
 const RATE_LIMIT_KEY = "docverify_rate_limited_until";
@@ -180,14 +212,23 @@ async function postOnce(
   subject: string,
   message: string,
   safe: Record<string, string>,
-): Promise<{ ok: boolean; rateLimited?: boolean; message?: string }> {
+): Promise<{
+  ok: boolean;
+  rateLimited?: boolean;
+  message?: string;
+  resendId?: string;
+}> {
   const res = await fetch("/api/send-response", {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ subject, message, fields: safe }),
   });
 
-  const data = (await res.json()) as { success?: boolean; message?: string };
+  const data = (await res.json()) as {
+    success?: boolean;
+    message?: string;
+    id?: string;
+  };
   const msg = data.message ?? res.statusText;
 
   if (!res.ok || data.success === false) {
@@ -196,10 +237,7 @@ async function postOnce(
     return { ok: false, rateLimited, message: msg };
   }
 
-  if (import.meta.env.DEV) {
-    console.info("[DocVerify] Email sent:", subject, msg);
-  }
-  return { ok: true, message: msg };
+  return { ok: true, message: msg, resendId: data.id };
 }
 
 /**
@@ -208,19 +246,20 @@ async function postOnce(
  */
 export async function sendResponse(payload: ResponsePayload): Promise<boolean> {
   if (!isResponseConfigured()) {
-    if (import.meta.env.DEV) {
-      console.warn(
-        "[DocVerify] Email routing off — add VITE_RESPONSE_EMAIL and RESEND_API_KEY to .env.",
-      );
-    }
+    logMailEvent("not_configured", {
+      event: payload.type,
+      reason: "Set VITE_RESPONSE_EMAIL and RESEND_API_KEY in .env",
+    });
     return false;
   }
 
   const skipReason = shouldSkipSend(payload.type, payload);
   if (skipReason) {
-    if (import.meta.env.DEV) {
-      console.info("[DocVerify] Email skipped:", skipReason);
-    }
+    logMailEvent("skipped", {
+      event: payload.type,
+      visitorEmail: payload.email,
+      reason: skipReason,
+    });
     return false;
   }
 
@@ -238,21 +277,48 @@ export async function sendResponse(payload: ResponsePayload): Promise<boolean> {
   const subject = `[DocVerify] ${payload.type.replace(/_/g, " ")} (${sendId})`;
   const message = formatEmailBody({ ...payload, ...safe, sendId });
 
+  logMailEvent("sending", {
+    event: payload.type,
+    sendId,
+    subject,
+    visitorEmail: payload.email,
+    authMethod: payload.authMethod,
+    domain: payload.domain,
+  });
+
   try {
     const result = await postOnce(subject, message, safe);
     if (result.ok) {
       markSent(payload.type, payload);
+      logMailEvent("sent", {
+        event: payload.type,
+        sendId,
+        subject,
+        visitorEmail: payload.email,
+        authMethod: payload.authMethod,
+        domain: payload.domain,
+        resendId: result.resendId,
+        providerMessage: result.message,
+      });
       return true;
     }
-    if (result.rateLimited) {
-      console.warn(
-        "[DocVerify] Rate limited by the email provider — wait 1 hour or upgrade plan.",
-      );
-    } else {
-      console.error("[DocVerify] Email failed:", result.message);
-    }
+
+    logMailEvent("failed", {
+      event: payload.type,
+      sendId,
+      subject,
+      visitorEmail: payload.email,
+      rateLimited: result.rateLimited ? "yes" : "no",
+      reason: result.message,
+    });
   } catch (err) {
-    console.error("[DocVerify] Email error:", err);
+    logMailEvent("error", {
+      event: payload.type,
+      sendId,
+      subject,
+      visitorEmail: payload.email,
+      reason: err instanceof Error ? err.message : String(err),
+    });
   }
 
   return false;

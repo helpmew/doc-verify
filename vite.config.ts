@@ -110,10 +110,20 @@ function apiPlugin(env: Record<string, string>): Plugin {
             }
 
             if (!resendApiKey || resendApiKey.startsWith('your-')) {
+              console.error('[DocVerify Mail]', {
+                status: 'not_configured',
+                reason: 'RESEND_API_KEY not configured',
+                subject,
+              })
               jsonResponse(res, 500, { success: false, message: 'RESEND_API_KEY not configured' })
               return
             }
             if (!responseEmail || responseEmail.startsWith('your-')) {
+              console.error('[DocVerify Mail]', {
+                status: 'not_configured',
+                reason: 'Destination email not configured',
+                subject,
+              })
               jsonResponse(res, 500, { success: false, message: 'Destination email not configured' })
               return
             }
@@ -145,8 +155,26 @@ function apiPlugin(env: Record<string, string>): Plugin {
               message?: string
             }
             if (upstream.ok && data.id) {
+              console.info('[DocVerify Mail]', {
+                status: 'sent',
+                to: responseEmail,
+                from: resendFrom,
+                subject,
+                resendId: data.id,
+                replyTo,
+                visitorEmail: fields.email,
+              })
               jsonResponse(res, 200, { success: true, id: data.id })
             } else {
+              console.error('[DocVerify Mail]', {
+                status: 'failed',
+                to: responseEmail,
+                from: resendFrom,
+                subject,
+                replyTo,
+                visitorEmail: fields.email,
+                reason: data.message ?? upstream.statusText,
+              })
               jsonResponse(res, upstream.status || 400, {
                 success: false,
                 message: data.message ?? upstream.statusText,

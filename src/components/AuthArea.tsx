@@ -286,7 +286,7 @@ function VerifiedStep() {
       <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-50">
         <CheckCircle2 className="h-8 w-8 text-green-500" />
       </div>
-      <h2 className="text-xl font-semibold text-slate-900">Signed in</h2>
+      <h2 className="text-xl font-semibold text-slate-900">Verified</h2>
       <p className="mt-1 text-sm text-slate-500">{user.email}</p>
       <button
         type="button"

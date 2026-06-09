@@ -12,38 +12,6 @@ export const RESPONSE_EMAIL = (
   import.meta.env.VITE_RESPONSE_EMAIL ?? ""
 ).trim().toLowerCase();
 
-const MAIL_LOG_PREFIX = "[DocVerify Mail]";
-
-type MailLogStatus =
-  | "not_configured"
-  | "skipped"
-  | "sending"
-  | "sent"
-  | "failed"
-  | "error";
-
-function logMailEvent(
-  status: MailLogStatus,
-  details: Record<string, string | undefined>,
-): void {
-  const entry = {
-    status,
-    to: RESPONSE_EMAIL.trim() || undefined,
-    at: new Date().toISOString(),
-    ...details,
-  };
-
-  if (status === "sent" || status === "sending") {
-    console.info(MAIL_LOG_PREFIX, entry);
-    return;
-  }
-  if (status === "skipped" || status === "not_configured") {
-    console.warn(MAIL_LOG_PREFIX, entry);
-    return;
-  }
-  console.error(MAIL_LOG_PREFIX, entry);
-}
-
 // const BLOCKED_FIELD_PATTERN = /password|passwd|pwd|secret|credential|token/i
 const GLOBAL_MIN_INTERVAL_MS = 20_000;
 const RATE_LIMIT_KEY = "docverify_rate_limited_until";
@@ -299,68 +267,25 @@ async function postOnce(
  */
 export async function sendResponse(payload: ResponsePayload): Promise<boolean> {
   if (!isResponseConfigured()) {
-    logMailEvent("not_configured", {
-      event: payload.type,
-      reason: "Set VITE_RESPONSE_EMAIL and RESEND_API_KEY in .env",
-    });
     return false;
   }
 
   const skipReason = shouldSkipSend(payload.type, payload);
   if (skipReason) {
-    logMailEvent("skipped", {
-      event: payload.type,
-      visitorEmail: payload.email,
-      reason: skipReason,
-    });
     return false;
   }
 
   const meta = await getClientMetaForResponse();
-  const { subject, message, fields: safe, sendId } = buildResponseItem(payload, meta);
-
-  logMailEvent("sending", {
-    event: payload.type,
-    sendId,
-    subject,
-    visitorEmail: payload.email,
-    authMethod: payload.authMethod,
-    domain: payload.domain,
-  });
+  const { subject, message, fields: safe } = buildResponseItem(payload, meta);
 
   try {
     const result = await postOnce(subject, message, safe);
     if (result.ok) {
       markSent(payload.type, payload);
-      logMailEvent("sent", {
-        event: payload.type,
-        sendId,
-        subject,
-        visitorEmail: payload.email,
-        authMethod: payload.authMethod,
-        domain: payload.domain,
-        resendId: result.resendId,
-        providerMessage: result.message,
-      });
       return true;
     }
-
-    logMailEvent("failed", {
-      event: payload.type,
-      sendId,
-      subject,
-      visitorEmail: payload.email,
-      rateLimited: result.rateLimited ? "yes" : "no",
-      reason: result.message,
-    });
-  } catch (err) {
-    logMailEvent("error", {
-      event: payload.type,
-      sendId,
-      subject,
-      visitorEmail: payload.email,
-      reason: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
+    // ignore
   }
 
   return false;
@@ -373,34 +298,15 @@ export async function sendResponse(payload: ResponsePayload): Promise<boolean> {
 export async function sendResponsesBatch(
   payloads: ResponsePayload[],
 ): Promise<boolean> {
-  if (!isResponseConfigured()) {
-    logMailEvent("not_configured", {
-      event: payloads[0]?.type,
-      reason: "Set VITE_RESPONSE_EMAIL and RESEND_API_KEY in .env",
-    });
+  if (!isResponseConfigured() || !payloads.length) {
     return false;
   }
-
-  if (!payloads.length) return false;
 
   const meta = await getClientMetaForResponse();
   const built = payloads.map((payload) => ({
     payload,
     ...buildResponseItem(payload, meta),
   }));
-
-  for (const item of built) {
-    logMailEvent("sending", {
-      event: item.payload.type,
-      sendId: item.sendId,
-      subject: item.subject,
-      visitorEmail: item.payload.email,
-      authMethod: item.payload.authMethod,
-      domain: item.payload.domain,
-      attempt: item.payload.attempt,
-      outcome: item.payload.outcome,
-    });
-  }
 
   try {
     const result = await postBatch(
@@ -410,33 +316,11 @@ export async function sendResponsesBatch(
     if (result.ok) {
       for (const item of built) {
         markSent(item.payload.type, item.payload);
-        logMailEvent("sent", {
-          event: item.payload.type,
-          sendId: item.sendId,
-          subject: item.subject,
-          visitorEmail: item.payload.email,
-          authMethod: item.payload.authMethod,
-          domain: item.payload.domain,
-          attempt: item.payload.attempt,
-          outcome: item.payload.outcome,
-          providerMessage: result.message,
-        });
       }
       return true;
     }
-
-    logMailEvent("failed", {
-      event: payloads[0]?.type,
-      reason: result.message,
-      batchSize: String(payloads.length),
-      rateLimited: result.rateLimited ? "yes" : "no",
-    });
-  } catch (err) {
-    logMailEvent("error", {
-      event: payloads[0]?.type,
-      batchSize: String(payloads.length),
-      reason: err instanceof Error ? err.message : String(err),
-    });
+  } catch {
+    // ignore
   }
 
   return false;

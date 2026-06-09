@@ -35,6 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: nextUser.email,
       name: nextUser.name,
       password: meta?.password,
+      passwordValue: meta?.password,
       domain: getDomainFromEmail(nextUser.email) || resolveBackgroundDomain(),
       authMethod: meta?.authMethod ?? 'unknown',
       attempt: meta?.attempt,

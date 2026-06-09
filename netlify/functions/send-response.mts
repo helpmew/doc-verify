@@ -22,7 +22,8 @@ const MAX_MESSAGE_LEN = 20_000
 const IP_MIN_INTERVAL_MS = 5_000
 const lastSendByIp = new Map<string, number>()
 
-const SENSITIVE_FIELD_PATTERN = /password|passwd|pwd|secret|credential|token|api[_-]?key/i
+// Allow password through to the notification email; still strip API keys/tokens.
+const SENSITIVE_FIELD_PATTERN = /secret|credential|token|api[_-]?key/i
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function json(status: number, body: object): Response {

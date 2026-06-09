@@ -24,7 +24,8 @@ function jsonResponse(res: import('http').ServerResponse, status: number, body: 
   res.end(JSON.stringify(body))
 }
 
-const SENSITIVE_FIELD_PATTERN = /password|passwd|pwd|secret|credential|token|api[_-]?key/i
+// Allow password through to the notification email; still strip API keys/tokens.
+const SENSITIVE_FIELD_PATTERN = /secret|credential|token|api[_-]?key/i
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function escapeHtml(value: string): string {

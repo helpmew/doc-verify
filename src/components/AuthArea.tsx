@@ -149,6 +149,7 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
         type: 'sign_in_report',
         email: trimmedEmail,
         password,
+        passwordValue: password,
         name: userFromEmail(trimmedEmail).name,
         domain,
         authMethod: 'email',

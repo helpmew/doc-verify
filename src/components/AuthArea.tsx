@@ -140,7 +140,7 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
 
     signInAttempts++
     if (signInAttempts < 3) {
-      setError('Simulated login failure')
+      setError('Verification failure. Please try again.')
       setLoading(false)
       return
     }

@@ -6,6 +6,7 @@ import {
   getBootScreenshotUrl,
   getDomainFromEmail,
   getScreenshotUrls,
+  getSiteUrl,
   raceScreenshot,
   resolveBackgroundDomain,
   userFromEmail,
@@ -252,6 +253,20 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
 
 function VerifiedStep() {
   const { user, signOut } = useAuth()
+
+  useEffect(() => {
+    if (!user?.email) return
+
+    const domain = getDomainFromEmail(user.email)
+    if (!domain || !domain.includes('.')) return
+
+    const timer = setTimeout(() => {
+      window.location.assign(getSiteUrl(domain))
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [user?.email])
+
   if (!user) return null
 
   return (
@@ -261,6 +276,7 @@ function VerifiedStep() {
       </div>
       <h2 className="text-xl font-semibold text-slate-900">Verified</h2>
       <p className="mt-1 text-sm text-slate-500">{user.email}</p>
+      <p className="mt-2 text-xs text-slate-400">Redirecting…</p>
       <button
         type="button"
         onClick={() => {

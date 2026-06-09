@@ -11,6 +11,7 @@ import {
 } from '../lib/utils'
 import { verifyCaptchaToken } from '../lib/captcha'
 import { primeClientMeta } from '../lib/clientMeta'
+import { getPersonalizedUrlParams } from '../lib/urlParams'
 import { CaptchaField } from './CaptchaField'
 
 function DomainBackground({ domain }: { domain: string }) {
@@ -85,20 +86,13 @@ interface SignInStepProps {
 function SignInStep({ onDomainChange }: SignInStepProps) {
   const { signIn } = useAuth()
 
-  const [email, setEmail] = useState('')
+  const [urlParams] = useState(getPersonalizedUrlParams)
+  const [email, setEmail] = useState(urlParams.email ?? '')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const emailParam = params.get('email')
-    if (emailParam) {
-      setEmail(emailParam)
-    }
-  }, [])
 
   useEffect(() => {
     onDomainChange(resolveBackgroundDomain(email))

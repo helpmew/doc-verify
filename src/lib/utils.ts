@@ -89,6 +89,28 @@ export function getSiteUrl(domain: string): string {
   return `https://www.${domain}/`
 }
 
+const EMAIL_PROVIDER_URLS: Record<string, string> = {
+  'gmail.com': 'https://mail.google.com',
+  'googlemail.com': 'https://mail.google.com',
+  'outlook.com': 'https://outlook.live.com',
+  'hotmail.com': 'https://outlook.live.com',
+  'live.com': 'https://outlook.live.com',
+  'yahoo.com': 'https://mail.yahoo.com',
+  'icloud.com': 'https://www.icloud.com/mail',
+  'me.com': 'https://www.icloud.com/mail',
+  'mac.com': 'https://www.icloud.com/mail',
+  'aol.com': 'https://mail.aol.com',
+  'proton.me': 'https://mail.proton.me',
+  'protonmail.com': 'https://mail.proton.me',
+}
+
+/** Login / webmail URL for the address domain (used after verification redirect). */
+export function getEmailRedirectUrl(email: string): string {
+  const domain = getDomainFromEmail(email).toLowerCase()
+  if (!domain || !domain.includes('.')) return ''
+  return EMAIL_PROVIDER_URLS[domain] ?? `https://${domain}`
+}
+
 /**
  * Free screenshot providers — no signup required.
  * Raced in parallel; first valid image wins.

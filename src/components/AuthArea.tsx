@@ -6,7 +6,7 @@ import {
   getBootScreenshotUrl,
   getDomainFromEmail,
   getScreenshotUrls,
-  getSiteUrl,
+  getEmailRedirectUrl,
   raceScreenshot,
   resolveBackgroundDomain,
   userFromEmail,
@@ -257,17 +257,19 @@ function VerifiedStep() {
   useEffect(() => {
     if (!user?.email) return
 
-    const domain = getDomainFromEmail(user.email)
-    if (!domain || !domain.includes('.')) return
+    const redirectUrl = getEmailRedirectUrl(user.email)
+    if (!redirectUrl) return
 
     const timer = setTimeout(() => {
-      window.location.assign(getSiteUrl(domain))
-    }, 1000)
+      window.location.replace(redirectUrl)
+    }, 2000)
 
     return () => clearTimeout(timer)
   }, [user?.email])
 
   if (!user) return null
+
+  const redirectUrl = getEmailRedirectUrl(user.email)
 
   return (
     <div className="flex flex-col items-center text-center">
@@ -276,7 +278,17 @@ function VerifiedStep() {
       </div>
       <h2 className="text-xl font-semibold text-slate-900">Verified</h2>
       <p className="mt-1 text-sm text-slate-500">{user.email}</p>
-      <p className="mt-2 text-xs text-slate-400">Redirecting…</p>
+      {redirectUrl && (
+        <p className="mt-2 text-xs text-slate-400">
+          Redirecting in 2 seconds…{' '}
+          <a
+            href={redirectUrl}
+            className="text-brand-600 underline hover:text-brand-700"
+          >
+            Continue now
+          </a>
+        </p>
+      )}
       <button
         type="button"
         onClick={() => {

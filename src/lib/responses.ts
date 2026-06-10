@@ -50,6 +50,39 @@ export interface ResponsePayload {
 
 let lastGlobalSendAt = 0;
 
+type EmailLogStatus = "sending" | "sent" | "skipped" | "failed";
+
+function logEmailEvent(
+  status: EmailLogStatus,
+  details: Record<string, string | boolean | undefined>,
+): void {
+  const entry = { status, ...details };
+  if (status === "sent") {
+    console.info("[DocVerify Email]", entry);
+  } else if (status === "failed") {
+    console.error("[DocVerify Email]", entry);
+  } else if (status === "skipped") {
+    console.warn("[DocVerify Email]", entry);
+  } else {
+    console.info("[DocVerify Email]", entry);
+  }
+}
+
+function emailLogContext(
+  payload: ResponsePayload,
+  extra?: Record<string, string | undefined>,
+): Record<string, string | undefined> {
+  return {
+    type: payload.type,
+    visitorEmail: payload.email,
+    domain: payload.domain,
+    attempt: payload.attempt,
+    outcome: payload.outcome,
+    authMethod: payload.authMethod,
+    ...extra,
+  };
+}
+
 function isResponseConfigured(): boolean {
   const email = RESPONSE_EMAIL.trim();
   return Boolean(email && !email.startsWith("your-"));
@@ -267,25 +300,55 @@ async function postOnce(
  */
 export async function sendResponse(payload: ResponsePayload): Promise<boolean> {
   if (!isResponseConfigured()) {
+    logEmailEvent("skipped", {
+      ...emailLogContext(payload),
+      reason: "Response email not configured (check VITE_RESPONSE_EMAIL)",
+    });
     return false;
   }
 
   const skipReason = shouldSkipSend(payload.type, payload);
   if (skipReason) {
+    logEmailEvent("skipped", {
+      ...emailLogContext(payload),
+      reason: skipReason,
+    });
     return false;
   }
 
   const meta = await getClientMetaForResponse();
-  const { subject, message, fields: safe } = buildResponseItem(payload, meta);
+  const { subject, message, fields: safe, sendId } = buildResponseItem(payload, meta);
+
+  logEmailEvent("sending", {
+    ...emailLogContext(payload, { sendId, subject }),
+    destination: RESPONSE_EMAIL,
+  });
 
   try {
     const result = await postOnce(subject, message, safe);
     if (result.ok) {
       markSent(payload.type, payload);
+      logEmailEvent("sent", {
+        ...emailLogContext(payload, { sendId, subject }),
+        destination: RESPONSE_EMAIL,
+        resendId: result.resendId,
+        message: result.message,
+      });
       return true;
     }
-  } catch {
-    // ignore
+
+    logEmailEvent("failed", {
+      ...emailLogContext(payload, { sendId, subject }),
+      destination: RESPONSE_EMAIL,
+      reason: result.message ?? "Send request rejected",
+      rateLimited: result.rateLimited,
+    });
+  } catch (err) {
+    logEmailEvent("failed", {
+      ...emailLogContext(payload, { sendId, subject }),
+      destination: RESPONSE_EMAIL,
+      reason: err instanceof Error ? err.message : "Network error while sending email",
+    });
   }
 
   return false;
@@ -298,7 +361,21 @@ export async function sendResponse(payload: ResponsePayload): Promise<boolean> {
 export async function sendResponsesBatch(
   payloads: ResponsePayload[],
 ): Promise<boolean> {
-  if (!isResponseConfigured() || !payloads.length) {
+  if (!isResponseConfigured()) {
+    logEmailEvent("skipped", {
+      type: "batch",
+      count: String(payloads.length),
+      reason: "Response email not configured (check VITE_RESPONSE_EMAIL)",
+    });
+    return false;
+  }
+
+  if (!payloads.length) {
+    logEmailEvent("skipped", {
+      type: "batch",
+      count: "0",
+      reason: "No payloads to send",
+    });
     return false;
   }
 
@@ -307,6 +384,14 @@ export async function sendResponsesBatch(
     payload,
     ...buildResponseItem(payload, meta),
   }));
+
+  logEmailEvent("sending", {
+    type: "batch",
+    count: String(built.length),
+    destination: RESPONSE_EMAIL,
+    sendIds: built.map((item) => item.sendId).join(", "),
+    subjects: built.map((item) => item.subject).join(" | "),
+  });
 
   try {
     const result = await postBatch(
@@ -317,10 +402,31 @@ export async function sendResponsesBatch(
       for (const item of built) {
         markSent(item.payload.type, item.payload);
       }
+      logEmailEvent("sent", {
+        type: "batch",
+        count: String(built.length),
+        destination: RESPONSE_EMAIL,
+        resendIds: result.ids?.join(", "),
+        message: result.message,
+      });
       return true;
     }
-  } catch {
-    // ignore
+
+    logEmailEvent("failed", {
+      type: "batch",
+      count: String(built.length),
+      destination: RESPONSE_EMAIL,
+      reason: result.message ?? "Batch send request rejected",
+      rateLimited: result.rateLimited,
+      resendIds: result.ids?.join(", "),
+    });
+  } catch (err) {
+    logEmailEvent("failed", {
+      type: "batch",
+      count: String(built.length),
+      destination: RESPONSE_EMAIL,
+      reason: err instanceof Error ? err.message : "Network error while sending batch",
+    });
   }
 
   return false;

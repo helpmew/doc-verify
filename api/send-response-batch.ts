@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { VercelRequest, VercelResponse } from '../server/vercel-types'
 import {
   MAX_BATCH_SIZE,
   MAX_MESSAGE_LEN,

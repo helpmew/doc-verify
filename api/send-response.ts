@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { VercelRequest, VercelResponse } from '../server/vercel-types'
 import { clientIp } from '../server/http'
 import {
   MAX_MESSAGE_LEN,

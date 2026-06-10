@@ -1,4 +1,4 @@
-import type { VercelRequest } from '@vercel/node'
+import type { VercelRequest } from './vercel-types'
 
 export function clientIp(req: VercelRequest): string {
   const forwarded = req.headers['x-forwarded-for']

@@ -319,6 +319,7 @@ async function postOnce(
   message?: string;
   resendId?: string;
   httpStatus?: number;
+  responseSnippet?: string;
 }> {
   const res = await fetch("/api/send-response", {
     method: "POST",
@@ -328,6 +329,7 @@ async function postOnce(
 
   const { data, rawText } = await parseApiResponse(res);
   const msg = formatApiError(res, data, rawText);
+  const responseSnippet = rawText.trim().slice(0, 200) || undefined;
 
   if (!res.ok || data.success === false || !data.id) {
     const rateLimited = /rate limit/i.test(msg);
@@ -336,7 +338,13 @@ async function postOnce(
       !res.ok || data.success === false
         ? msg
         : "Send accepted but no message id returned from provider";
-    return { ok: false, rateLimited, message: reason, httpStatus: res.status };
+    return {
+      ok: false,
+      rateLimited,
+      message: reason || "Send request rejected",
+      httpStatus: res.status,
+      responseSnippet,
+    };
   }
 
   return { ok: true, message: msg, resendId: data.id, httpStatus: res.status };
@@ -388,8 +396,9 @@ export async function sendResponse(payload: ResponsePayload): Promise<boolean> {
     logEmailEvent("failed", {
       ...emailLogContext(payload, { sendId, subject }),
       destination: RESPONSE_EMAIL,
-      reason: result.message ?? "Send request rejected",
+      reason: result.message || "Send request rejected",
       httpStatus: result.httpStatus ? String(result.httpStatus) : undefined,
+      responseSnippet: result.responseSnippet,
       rateLimited: result.rateLimited,
     });
   } catch (err) {

@@ -6,7 +6,7 @@ interface CaptchaFieldProps {
   onExpire?: () => void
 }
 
-/** Token both the dev middleware and the Netlify function accept as pre-verified. */
+/** Token both the dev middleware and the API route accept as pre-verified. */
 const AUTO_VERIFY_TOKEN = 'demo-captcha-verified'
 
 type Phase = 'idle' | 'checking' | 'verified'

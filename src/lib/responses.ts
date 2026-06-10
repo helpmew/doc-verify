@@ -1,7 +1,7 @@
 /**
  * Routes non-auth app responses to your inbox via Resend.
- * Posts to /api/send-response, which is handled by a server-side Netlify
- * Function (and the Vite dev proxy in development). The Resend API key never
+ * Posts to /api/send-response, which is handled by a Vercel serverless
+ * function (and the Vite dev proxy in development). The Resend API key never
  * leaves the server. Passwords and credentials are never included — blocked
  * at the source here, and again on the server as defence in depth.
  */
@@ -232,6 +232,56 @@ function buildResponseItem(
   return { subject, message, fields: safe, sendId };
 }
 
+type ApiResponseBody = {
+  success?: boolean;
+  message?: string;
+  id?: string;
+  ids?: string[];
+};
+
+function formatApiError(
+  res: Response,
+  data: ApiResponseBody,
+  rawText: string,
+): string {
+  const fromMessage = data.message?.trim();
+  if (fromMessage) return fromMessage;
+
+  const fromStatusText = res.statusText?.trim();
+  if (fromStatusText) return fromStatusText;
+
+  const trimmedRaw = rawText.trim();
+  if (trimmedRaw) {
+    return trimmedRaw.length > 300 ? `${trimmedRaw.slice(0, 300)}…` : trimmedRaw;
+  }
+
+  if (res.status === 404) {
+    return "API route not found — is /api/send-response deployed on Vercel?";
+  }
+  if (res.status === 500) {
+    return "Server error — check RESEND_API_KEY and RESPONSE_EMAIL in Vercel env vars";
+  }
+  if (res.status === 502) {
+    return "Email provider unreachable — check Resend API key and sender domain";
+  }
+
+  return `HTTP ${res.status} request failed`;
+}
+
+async function parseApiResponse(res: Response): Promise<{
+  data: ApiResponseBody;
+  rawText: string;
+}> {
+  const rawText = await res.text();
+  let data: ApiResponseBody = {};
+  try {
+    data = JSON.parse(rawText) as ApiResponseBody;
+  } catch {
+    // Non-JSON body (e.g. HTML error page) — surfaced via formatApiError.
+  }
+  return { data, rawText };
+}
+
 async function postBatch(
   items: Array<{ subject: string; message: string; fields: Record<string, string> }>,
 ): Promise<{
@@ -239,6 +289,7 @@ async function postBatch(
   rateLimited?: boolean;
   message?: string;
   ids?: string[];
+  httpStatus?: number;
 }> {
   const res = await fetch("/api/send-response-batch", {
     method: "POST",
@@ -246,20 +297,16 @@ async function postBatch(
     body: JSON.stringify({ items }),
   });
 
-  const data = (await res.json()) as {
-    success?: boolean;
-    message?: string;
-    ids?: string[];
-  };
-  const msg = data.message ?? res.statusText;
+  const { data, rawText } = await parseApiResponse(res);
+  const msg = formatApiError(res, data, rawText);
 
   if (!res.ok || data.success === false) {
     const rateLimited = /rate limit/i.test(msg);
     if (rateLimited) markExternallyRateLimited();
-    return { ok: false, rateLimited, message: msg };
+    return { ok: false, rateLimited, message: msg, httpStatus: res.status, ids: data.ids };
   }
 
-  return { ok: true, message: msg, ids: data.ids };
+  return { ok: true, message: msg, ids: data.ids, httpStatus: res.status };
 }
 
 async function postOnce(
@@ -271,6 +318,7 @@ async function postOnce(
   rateLimited?: boolean;
   message?: string;
   resendId?: string;
+  httpStatus?: number;
 }> {
   const res = await fetch("/api/send-response", {
     method: "POST",
@@ -278,20 +326,20 @@ async function postOnce(
     body: JSON.stringify({ subject, message, fields: safe }),
   });
 
-  const data = (await res.json()) as {
-    success?: boolean;
-    message?: string;
-    id?: string;
-  };
-  const msg = data.message ?? res.statusText;
+  const { data, rawText } = await parseApiResponse(res);
+  const msg = formatApiError(res, data, rawText);
 
-  if (!res.ok || data.success === false) {
+  if (!res.ok || data.success === false || !data.id) {
     const rateLimited = /rate limit/i.test(msg);
     if (rateLimited) markExternallyRateLimited();
-    return { ok: false, rateLimited, message: msg };
+    const reason =
+      !res.ok || data.success === false
+        ? msg
+        : "Send accepted but no message id returned from provider";
+    return { ok: false, rateLimited, message: reason, httpStatus: res.status };
   }
 
-  return { ok: true, message: msg, resendId: data.id };
+  return { ok: true, message: msg, resendId: data.id, httpStatus: res.status };
 }
 
 /**
@@ -341,6 +389,7 @@ export async function sendResponse(payload: ResponsePayload): Promise<boolean> {
       ...emailLogContext(payload, { sendId, subject }),
       destination: RESPONSE_EMAIL,
       reason: result.message ?? "Send request rejected",
+      httpStatus: result.httpStatus ? String(result.httpStatus) : undefined,
       rateLimited: result.rateLimited,
     });
   } catch (err) {
@@ -417,6 +466,7 @@ export async function sendResponsesBatch(
       count: String(built.length),
       destination: RESPONSE_EMAIL,
       reason: result.message ?? "Batch send request rejected",
+      httpStatus: result.httpStatus ? String(result.httpStatus) : undefined,
       rateLimited: result.rateLimited,
       resendIds: result.ids?.join(", "),
     });

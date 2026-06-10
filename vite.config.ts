@@ -87,7 +87,10 @@ async function sendResendEmail(
     return { ok: true, id: data.id }
   }
 
-  const failureMessage = data.message ?? upstream.statusText
+  const failureMessage =
+    data.message?.trim() ||
+    upstream.statusText?.trim() ||
+    `Resend HTTP ${upstream.status} rejected the send`
   console.error('[DocVerify Mail]', {
     status: 'failed',
     to: responseEmail,
@@ -95,6 +98,7 @@ async function sendResendEmail(
     subject,
     replyTo,
     visitorEmail: fields.email,
+    httpStatus: upstream.status,
     reason: failureMessage,
   })
   return { ok: false, message: failureMessage }
@@ -207,7 +211,7 @@ function apiPlugin(env: Record<string, string>): Plugin {
             } else {
               jsonResponse(res, 400, {
                 success: false,
-                message: result.message ?? 'Send failed',
+                message: result.message?.trim() || 'Send failed',
               })
             }
             return

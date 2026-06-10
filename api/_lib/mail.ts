@@ -4,7 +4,6 @@ export const MAX_SUBJECT_LEN = 200
 export const MAX_MESSAGE_LEN = 20_000
 export const MAX_BATCH_SIZE = 5
 
-// Allow password through to the notification email; still strip API keys/tokens.
 export const SENSITIVE_FIELD_PATTERN = /secret|credential|token|api[_-]?key/i
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 

@@ -1,32 +1,34 @@
-import type { VercelRequest, VercelResponse } from '../server/vercel-types'
-import { clientIp } from '../server/http'
+import { clientIp, json } from './_lib/http'
 import {
   MAX_MESSAGE_LEN,
   MAX_SUBJECT_LEN,
   resolveMailConfig,
   sanitizeFields,
   sendResendEmail,
-} from '../server/mail'
+} from './_lib/mail'
+
+export const config = { runtime: 'edge' }
 
 const IP_MIN_INTERVAL_MS = 5_000
 const lastSendByIp = new Map<string, number>()
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, message: 'Method not allowed' })
+export default async function handler(request: Request): Promise<Response> {
+  if (request.method !== 'POST') {
+    return json(405, { success: false, message: 'Method not allowed' })
   }
 
-  const ip = clientIp(req)
+  const ip = clientIp(request)
   const now = Date.now()
   const last = lastSendByIp.get(ip) ?? 0
   if (now - last < IP_MIN_INTERVAL_MS) {
-    return res.status(429).json({ success: false, message: 'Too many requests — slow down.' })
+    return json(429, { success: false, message: 'Too many requests — slow down.' })
   }
 
-  const body = (req.body ?? {}) as {
-    subject?: unknown
-    message?: unknown
-    fields?: unknown
+  let body: { subject?: unknown; message?: unknown; fields?: unknown }
+  try {
+    body = (await request.json()) as typeof body
+  } catch {
+    return json(400, { success: false, message: 'Invalid JSON' })
   }
 
   const subject = typeof body.subject === 'string' ? body.subject.trim() : ''
@@ -37,10 +39,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       : {}
 
   if (!subject || !message) {
-    return res.status(400).json({ success: false, message: 'Missing subject or message' })
+    return json(400, { success: false, message: 'Missing subject or message' })
   }
   if (subject.length > MAX_SUBJECT_LEN || message.length > MAX_MESSAGE_LEN) {
-    return res.status(413).json({ success: false, message: 'Subject or message too long' })
+    return json(413, { success: false, message: 'Subject or message too long' })
   }
 
   const fields = sanitizeFields(rawFields)
@@ -52,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       reason: mailConfig.configError,
       subject,
     })
-    return res.status(500).json({ success: false, message: mailConfig.configError })
+    return json(500, { success: false, message: mailConfig.configError })
   }
 
   const result = await sendResendEmail(
@@ -66,10 +68,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (result.ok && result.id) {
     lastSendByIp.set(ip, now)
-    return res.status(200).json({ success: true, id: result.id })
+    return json(200, { success: true, id: result.id })
   }
 
-  return res.status(400).json({
+  return json(400, {
     success: false,
     message: result.message?.trim() || 'Send failed',
   })

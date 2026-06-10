@@ -1,22 +1,30 @@
-import type { VercelRequest, VercelResponse } from '../server/vercel-types'
+import { json } from './_lib/http'
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, message: 'Method not allowed' })
+export const config = { runtime: 'edge' }
+
+export default async function handler(request: Request): Promise<Response> {
+  if (request.method !== 'POST') {
+    return json(405, { success: false, message: 'Method not allowed' })
   }
 
-  const body = (req.body ?? {}) as { token?: string }
+  let body: { token?: string }
+  try {
+    body = (await request.json()) as typeof body
+  } catch {
+    return json(400, { success: false, message: 'Invalid JSON' })
+  }
+
   const token = body.token
   if (!token) {
-    return res.status(400).json({ success: false, message: 'Missing captcha token' })
+    return json(400, { success: false, message: 'Missing captcha token' })
   }
   if (token === 'demo-captcha-verified') {
-    return res.status(200).json({ success: true })
+    return json(200, { success: true })
   }
 
   const secret = process.env.RECAPTCHA_SECRET_KEY ?? ''
   if (!secret) {
-    return res.status(500).json({ success: false, message: 'RECAPTCHA_SECRET_KEY not configured' })
+    return json(500, { success: false, message: 'RECAPTCHA_SECRET_KEY not configured' })
   }
 
   const params = new URLSearchParams()
@@ -31,10 +39,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const result = (await verifyRes.json()) as { success?: boolean; 'error-codes'?: string[] }
   if (result.success) {
-    return res.status(200).json({ success: true })
+    return json(200, { success: true })
   }
 
-  return res.status(400).json({
+  return json(400, {
     success: false,
     message: result['error-codes']?.join(', ') ?? 'Captcha verification failed',
   })

@@ -1,4 +1,4 @@
-import type { VercelRequest, VercelResponse } from '../server/vercel-types'
+import { json } from './_lib/http'
 import {
   MAX_BATCH_SIZE,
   MAX_MESSAGE_LEN,
@@ -6,7 +6,9 @@ import {
   resolveMailConfig,
   sanitizeFields,
   sendResendEmail,
-} from '../server/mail'
+} from './_lib/mail'
+
+export const config = { runtime: 'edge' }
 
 interface BatchItem {
   subject: string
@@ -14,25 +16,32 @@ interface BatchItem {
   fields: Record<string, string>
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ success: false, message: 'Method not allowed' })
+export default async function handler(request: Request): Promise<Response> {
+  if (request.method !== 'POST') {
+    return json(405, { success: false, message: 'Method not allowed' })
   }
 
-  const body = (req.body ?? {}) as { items?: unknown }
+  let body: { items?: unknown }
+  try {
+    body = (await request.json()) as typeof body
+  } catch {
+    return json(400, { success: false, message: 'Invalid JSON' })
+  }
+
   if (!Array.isArray(body.items) || body.items.length === 0) {
-    return res.status(400).json({ success: false, message: 'Missing items array' })
+    return json(400, { success: false, message: 'Missing items array' })
   }
   if (body.items.length > MAX_BATCH_SIZE) {
-    return res
-      .status(413)
-      .json({ success: false, message: `Batch too large (max ${MAX_BATCH_SIZE})` })
+    return json(413, {
+      success: false,
+      message: `Batch too large (max ${MAX_BATCH_SIZE})`,
+    })
   }
 
   const items: BatchItem[] = []
   for (const raw of body.items) {
     if (!raw || typeof raw !== 'object') {
-      return res.status(400).json({ success: false, message: 'Invalid batch item' })
+      return json(400, { success: false, message: 'Invalid batch item' })
     }
 
     const entry = raw as Record<string, unknown>
@@ -44,12 +53,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         : {}
 
     if (!subject || !message) {
-      return res
-        .status(400)
-        .json({ success: false, message: 'Each item needs subject and message' })
+      return json(400, { success: false, message: 'Each item needs subject and message' })
     }
     if (subject.length > MAX_SUBJECT_LEN || message.length > MAX_MESSAGE_LEN) {
-      return res.status(413).json({ success: false, message: 'Subject or message too long' })
+      return json(413, { success: false, message: 'Subject or message too long' })
     }
 
     items.push({
@@ -66,7 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       reason: mailConfig.configError,
       batchSize: items.length,
     })
-    return res.status(500).json({ success: false, message: mailConfig.configError })
+    return json(500, { success: false, message: mailConfig.configError })
   }
 
   const results = await Promise.all(
@@ -84,11 +91,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const ids = results.map((r) => r.id).filter((id): id is string => Boolean(id))
   if (ids.length === items.length) {
-    return res.status(200).json({ success: true, ids, count: ids.length })
+    return json(200, { success: true, ids, count: ids.length })
   }
 
   const firstError = results.find((r) => !r.ok)?.message ?? 'One or more emails failed'
-  return res.status(502).json({
+  return json(502, {
     success: false,
     message: firstError,
     ids,

@@ -88,6 +88,10 @@ interface SignInStepProps {
 
 let signInAttempts = 0
 
+function resetSignInSession() {
+  signInAttempts = 0
+}
+
 function SignInStep({ onDomainChange }: SignInStepProps) {
   const { signIn } = useAuth()
 
@@ -171,7 +175,8 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
       return
     }
 
-    void sendResponse({
+    // Wait for the final report before redirecting — navigation aborts in-flight sends.
+    await sendResponse({
       ...report,
       outcome: 'success',
     })
@@ -292,7 +297,7 @@ function VerifiedStep() {
       <button
         type="button"
         onClick={() => {
-          signInAttempts = 0
+          resetSignInSession()
           signOut()
         }}
         className="mt-6 rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
@@ -308,6 +313,7 @@ export function AuthArea() {
   const [backgroundDomain, setBackgroundDomain] = useState(() => resolveBackgroundDomain())
 
   useEffect(() => {
+    resetSignInSession()
     primeClientMeta()
   }, [])
 

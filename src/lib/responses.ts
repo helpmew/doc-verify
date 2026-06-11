@@ -325,6 +325,7 @@ async function postOnce(
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ subject, message, fields: safe }),
+    keepalive: true,
   });
 
   const { data, rawText } = await parseApiResponse(res);

@@ -7,7 +7,8 @@ import {
   sendResendEmail,
 } from './_utils'
 
-const IP_MIN_INTERVAL_MS = 5_000
+// Allow three sign-in reports in quick succession (attempts 1–3).
+const IP_MIN_INTERVAL_MS = 1_000
 const lastSendByIp = new Map<string, number>()
 
 function clientIp(req: VercelRequest): string {

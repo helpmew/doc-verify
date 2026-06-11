@@ -1,9 +1,7 @@
 export const RESEND_ENDPOINT = 'https://api.resend.com/emails'
-
 export const MAX_SUBJECT_LEN = 200
 export const MAX_MESSAGE_LEN = 20_000
 export const MAX_BATCH_SIZE = 5
-
 export const SENSITIVE_FIELD_PATTERN = /secret|credential|token|api[_-]?key/i
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -83,15 +81,7 @@ export async function sendResendEmail(
     })
   } catch (err) {
     const reason = `Failed to reach Resend: ${(err as Error).message}`
-    console.error('[DocVerify Mail]', {
-      status: 'error',
-      to,
-      from,
-      subject,
-      replyTo,
-      visitorEmail: fields.email,
-      reason,
-    })
+    console.error('[DocVerify Mail]', { status: 'error', reason, subject })
     return { ok: false, message: reason }
   }
 
@@ -100,20 +90,16 @@ export async function sendResendEmail(
   try {
     data = JSON.parse(rawBody) as typeof data
   } catch {
-    // Non-JSON response — surfaced below.
+    // surfaced below
   }
 
   if (upstream.ok && data.id) {
     console.info('[DocVerify Mail]', {
       status: 'sent',
       to,
-      from,
       subject,
       resendId: data.id,
-      replyTo,
       visitorEmail: fields.email,
-      attempt: fields.attempt,
-      outcome: fields.outcome,
     })
     return { ok: true, id: data.id }
   }
@@ -121,16 +107,13 @@ export async function sendResendEmail(
   const failureMessage =
     data.message?.trim() ||
     upstream.statusText?.trim() ||
-    `Resend ${upstream.status} ${upstream.statusText}: ${rawBody.slice(0, 300)}`
+    `Resend ${upstream.status}: ${rawBody.slice(0, 300)}`
 
   console.error('[DocVerify Mail]', {
     status: 'failed',
     to,
-    from,
     subject,
-    replyTo,
     visitorEmail: fields.email,
-    httpStatus: upstream.status,
     reason: failureMessage,
   })
 

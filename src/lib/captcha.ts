@@ -1,3 +1,5 @@
+import { apiUrl } from './api'
+
 /** Server-side reCAPTCHA verification (dev: Vite middleware at /api/verify-captcha) */
 export async function verifyCaptchaToken(token: string): Promise<{ ok: boolean; message?: string }> {
   if (token === 'demo-captcha-verified') {
@@ -5,7 +7,7 @@ export async function verifyCaptchaToken(token: string): Promise<{ ok: boolean; 
   }
 
   try {
-    const res = await fetch('/api/verify-captcha', {
+    const res = await fetch(apiUrl('/api/verify-captcha'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token }),

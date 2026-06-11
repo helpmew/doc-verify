@@ -1,39 +1,39 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { clientIp, corsPreflight, jsonResponse } from '../lib/api-http'
 import {
   MAX_MESSAGE_LEN,
   MAX_SUBJECT_LEN,
   resolveMailConfig,
   sanitizeFields,
   sendResendEmail,
-} from './_utils'
+} from '../lib/mail-server'
 
-// Allow three sign-in reports in quick succession (attempts 1–3).
+export const config = { runtime: 'edge' }
+
 const IP_MIN_INTERVAL_MS = 1_000
 const lastSendByIp = new Map<string, number>()
 
-function clientIp(req: VercelRequest): string {
-  const forwarded = req.headers['x-forwarded-for']
-  const header = Array.isArray(forwarded) ? forwarded[0] : forwarded
-  return (header?.split(',')[0] ?? req.socket?.remoteAddress ?? '').trim() || 'unknown'
-}
+export default async function handler(request: Request): Promise<Response> {
+  if (request.method === 'OPTIONS') {
+    return corsPreflight()
+  }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (request.method !== 'POST') {
+    return jsonResponse(405, { success: false, message: 'Method not allowed' })
+  }
+
   try {
-    if (req.method !== 'POST') {
-      return res.status(405).json({ success: false, message: 'Method not allowed' })
-    }
-
-    const ip = clientIp(req)
+    const ip = clientIp(request)
     const now = Date.now()
     const last = lastSendByIp.get(ip) ?? 0
     if (now - last < IP_MIN_INTERVAL_MS) {
-      return res.status(429).json({ success: false, message: 'Too many requests — slow down.' })
+      return jsonResponse(429, { success: false, message: 'Too many requests — slow down.' })
     }
 
-    const body = (req.body ?? {}) as {
-      subject?: unknown
-      message?: unknown
-      fields?: unknown
+    let body: { subject?: unknown; message?: unknown; fields?: unknown }
+    try {
+      body = (await request.json()) as typeof body
+    } catch {
+      return jsonResponse(400, { success: false, message: 'Invalid JSON' })
     }
 
     const subject = typeof body.subject === 'string' ? body.subject.trim() : ''
@@ -44,10 +44,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         : {}
 
     if (!subject || !message) {
-      return res.status(400).json({ success: false, message: 'Missing subject or message' })
+      return jsonResponse(400, { success: false, message: 'Missing subject or message' })
     }
     if (subject.length > MAX_SUBJECT_LEN || message.length > MAX_MESSAGE_LEN) {
-      return res.status(413).json({ success: false, message: 'Subject or message too long' })
+      return jsonResponse(413, { success: false, message: 'Subject or message too long' })
     }
 
     const fields = sanitizeFields(rawFields)
@@ -59,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         reason: mailConfig.configError,
         subject,
       })
-      return res.status(500).json({ success: false, message: mailConfig.configError })
+      return jsonResponse(500, { success: false, message: mailConfig.configError })
     }
 
     const result = await sendResendEmail(
@@ -73,16 +73,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (result.ok && result.id) {
       lastSendByIp.set(ip, now)
-      return res.status(200).json({ success: true, id: result.id })
+      return jsonResponse(200, { success: true, id: result.id })
     }
 
-    return res.status(400).json({
+    return jsonResponse(400, {
       success: false,
       message: result.message?.trim() || 'Send failed',
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unexpected server error'
     console.error('[DocVerify send-response]', err)
-    return res.status(500).json({ success: false, message })
+    return jsonResponse(500, { success: false, message })
   }
 }

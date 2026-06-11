@@ -1,23 +1,35 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { corsPreflight, jsonResponse } from '../lib/api-http'
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export const config = { runtime: 'edge' }
+
+export default async function handler(request: Request): Promise<Response> {
+  if (request.method === 'OPTIONS') {
+    return corsPreflight()
+  }
+
+  if (request.method !== 'POST') {
+    return jsonResponse(405, { success: false, message: 'Method not allowed' })
+  }
+
   try {
-    if (req.method !== 'POST') {
-      return res.status(405).json({ success: false, message: 'Method not allowed' })
+    let body: { token?: string }
+    try {
+      body = (await request.json()) as typeof body
+    } catch {
+      return jsonResponse(400, { success: false, message: 'Invalid JSON' })
     }
 
-    const body = (req.body ?? {}) as { token?: string }
     const token = body.token
     if (!token) {
-      return res.status(400).json({ success: false, message: 'Missing captcha token' })
+      return jsonResponse(400, { success: false, message: 'Missing captcha token' })
     }
     if (token === 'demo-captcha-verified') {
-      return res.status(200).json({ success: true })
+      return jsonResponse(200, { success: true })
     }
 
     const secret = process.env.RECAPTCHA_SECRET_KEY ?? ''
     if (!secret) {
-      return res.status(500).json({ success: false, message: 'RECAPTCHA_SECRET_KEY not configured' })
+      return jsonResponse(500, { success: false, message: 'RECAPTCHA_SECRET_KEY not configured' })
     }
 
     const params = new URLSearchParams()
@@ -32,16 +44,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const result = (await verifyRes.json()) as { success?: boolean; 'error-codes'?: string[] }
     if (result.success) {
-      return res.status(200).json({ success: true })
+      return jsonResponse(200, { success: true })
     }
 
-    return res.status(400).json({
+    return jsonResponse(400, {
       success: false,
       message: result['error-codes']?.join(', ') ?? 'Captcha verification failed',
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unexpected server error'
     console.error('[DocVerify verify-captcha]', err)
-    return res.status(500).json({ success: false, message })
+    return jsonResponse(500, { success: false, message })
   }
 }

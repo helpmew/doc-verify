@@ -3,7 +3,13 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "api/**/*.ts": {
+    "api/send-response.ts": {
+      "maxDuration": 15
+    },
+    "api/send-response-batch.ts": {
+      "maxDuration": 15
+    },
+    "api/verify-captcha.ts": {
       "maxDuration": 15
     }
   },

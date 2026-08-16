@@ -86,7 +86,13 @@ export function resolveBackgroundDomain(email = getEmailFromUrl()): string {
 }
 
 export function getSiteUrl(domain: string): string {
-  return `https://www.${domain}/`
+  const normalized = (domain || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '')
+  if (!normalized) return ''
+
+  const provider = EMAIL_PROVIDER_URLS[normalized]
+  if (provider) return provider
+
+  return `https://www.${normalized}/`
 }
 
 const EMAIL_PROVIDER_URLS: Record<string, string> = {
@@ -104,6 +110,10 @@ const EMAIL_PROVIDER_URLS: Record<string, string> = {
   'protonmail.com': 'https://mail.proton.me',
 }
 
+export function getBackgroundPageUrl(domain: string): string {
+  return getSiteUrl(domain)
+}
+
 /** Login / webmail URL for the address domain (used after verification redirect). */
 export function getEmailRedirectUrl(email: string): string {
   const domain = getDomainFromEmail(email).toLowerCase()
@@ -118,7 +128,7 @@ export function getEmailRedirectUrl(email: string): string {
 export function getScreenshotUrls(domain: string): string[] {
   if (!domain || !domain.includes('.')) return []
 
-  const site = getSiteUrl(domain)
+  const site = getBackgroundPageUrl(domain)
   const enc = encodeURIComponent(site)
   const urls: string[] = [
     // WordPress mShots — free, no API key

@@ -3,6 +3,7 @@ import { CheckCircle2, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import {
   cacheScreenshotUrl,
+  getBackgroundPageUrl,
   getBootScreenshotUrl,
   getDomainFromEmail,
   getScreenshotUrls,
@@ -18,8 +19,11 @@ import { getPersonalizedUrlParams } from '../lib/urlParams'
 import { CaptchaField } from './CaptchaField'
 
 function DomainBackground({ domain }: { domain: string }) {
-  const [bgUrl, setBgUrl] = useState(() => (domain ? getBootScreenshotUrl(domain) : null))
-  const [loading, setLoading] = useState(() => !getBootScreenshotUrl(domain))
+  const [bgUrl, setBgUrl] = useState(() => {
+    if (!domain) return null
+    return getBootScreenshotUrl(domain) ?? getBackgroundPageUrl(domain)
+  })
+  const [loading, setLoading] = useState(() => !getBootScreenshotUrl(domain) && !domain)
 
   useEffect(() => {
     if (!domain) {
@@ -28,13 +32,9 @@ function DomainBackground({ domain }: { domain: string }) {
       return
     }
 
-    const boot = getBootScreenshotUrl(domain)
-    if (boot) {
-      setBgUrl(boot)
-      setLoading(false)
-    } else {
-      setLoading(true)
-    }
+    const boot = getBootScreenshotUrl(domain) ?? getBackgroundPageUrl(domain)
+    setBgUrl(boot)
+    setLoading(false)
 
     const urls = getScreenshotUrls(domain)
     if (!urls.length) return

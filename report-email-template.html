@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Professional Report Email</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #f3f6fb;
+        font-family: Arial, Helvetica, sans-serif;
+        color: #1f2937;
+      }
+      table {
+        border-spacing: 0;
+        width: 100%;
+      }
+      a {
+        text-decoration: none;
+      }
+      .wrapper {
+        width: 100%;
+        padding: 30px 12px;
+      }
+      .container {
+        max-width: 640px;
+        margin: 0 auto;
+        background: #ffffff;
+        border: 1px solid #e7ecf3;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .header {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        padding: 28px 32px 22px;
+      }
+      .brand {
+        font-size: 24px;
+        font-weight: 700;
+        color: #ffffff;
+      }
+      .header-meta {
+        margin-top: 10px;
+        font-size: 11px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        color: #dfe8f5;
+      }
+      .content {
+        padding: 28px 32px 20px;
+      }
+      .eyebrow {
+        display: inline-block;
+        background: #edf4ff;
+        color: #2347b7;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        border-radius: 999px;
+        padding: 7px 12px;
+        margin-bottom: 16px;
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 30px;
+        line-height: 1.25;
+        color: #111827;
+      }
+      .intro {
+        margin: 0 0 22px;
+        font-size: 14px;
+        line-height: 1.7;
+        color: #4b5563;
+      }
+      .metrics {
+        margin-bottom: 24px;
+      }
+      .metric-box {
+        background: #f8fafc;
+        border: 1px solid #ebf0f6;
+        border-radius: 10px;
+        padding: 18px 16px;
+      }
+      .metric-label {
+        font-size: 10px;
+        color: #64748b;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+      }
+      .metric-value {
+        font-size: 26px;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0;
+      }
+      .metric-change {
+        font-size: 12px;
+        color: #0f9f6e;
+        font-weight: 700;
+        margin-top: 8px;
+      }
+      .section {
+        margin-top: 22px;
+      }
+      .section h2 {
+        margin: 0 0 12px;
+        font-size: 20px;
+        color: #111827;
+      }
+      .summary-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .summary-list li {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-left: 4px solid #2f6fed;
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 10px;
+        font-size: 14px;
+        line-height: 1.6;
+        color: #374151;
+      }
+      .table-wrap {
+        background: #f8fafc;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      table.data-table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      .data-table th,
+      .data-table td {
+        padding: 12px 14px;
+        text-align: left;
+        border-bottom: 1px solid #e5e7eb;
+        font-size: 13px;
+      }
+      .data-table th {
+        background: #eef3ff;
+        color: #1f2937;
+        font-size: 10px;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+      }
+      .data-table td {
+        color: #475467;
+      }
+      .data-table tr:last-child td {
+        border-bottom: none;
+      }
+      .status-positive {
+        color: #0f9f6e;
+        font-weight: 700;
+      }
+      .cta {
+        margin-top: 22px;
+        text-align: center;
+      }
+      .button {
+        display: inline-block;
+        background: #1d4ed8;
+        color: #ffffff !important;
+        font-size: 14px;
+        font-weight: 700;
+        padding: 12px 22px;
+        border-radius: 8px;
+      }
+      .footer {
+        background: #f8fafc;
+        border-top: 1px solid #e5e7eb;
+        padding: 20px 32px 24px;
+      }
+      .footer p {
+        margin: 0 0 6px;
+        font-size: 12px;
+        line-height: 1.7;
+        color: #64748b;
+      }
+      @media only screen and (max-width: 640px) {
+        .header, .content, .footer { padding-left: 20px !important; padding-right: 20px !important; }
+        h1 { font-size: 26px !important; }
+        .metric-value { font-size: 22px !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <div style="display: none; max-height: 0; overflow: hidden; opacity: 0; mso-hide: all;">
+      Report Summary and Key Findings
+    </div>
+
+    <div class="wrapper">
+      <div class="container">
+        <div class="header">
+          <div class="brand">DocVerify</div>
+          <div class="header-meta">Performance Report • [Month Year]</div>
+        </div>
+
+        <div class="content">
+          <div class="eyebrow">Report Summary</div>
+          <h1>Monthly Performance Report</h1>
+          <p class="intro">
+            Dear [Recipient Name],<br /><br />
+            Please find below a concise overview of our recent performance and key results for this period.
+            The summary highlights progress, current trends, and the main areas to focus on moving forward.
+          </p>
+
+          <table class="metrics" role="presentation" width="100%">
+            <tr>
+              <td style="padding: 0 8px 8px 0; vertical-align: top; width: 33.33%;">
+                <div class="metric-box">
+                  <div class="metric-label">Reports</div>
+                  <p class="metric-value">1,248</p>
+                  <div class="metric-change">+12.4%</div>
+                </div>
+              </td>
+              <td style="padding: 0 8px 8px 8px; vertical-align: top; width: 33.33%;">
+                <div class="metric-box">
+                  <div class="metric-label">Completion</div>
+                  <p class="metric-value">94.8%</p>
+                  <div class="metric-change">+3.1%</div>
+                </div>
+              </td>
+              <td style="padding: 0 0 8px 8px; vertical-align: top; width: 33.33%;">
+                <div class="metric-box">
+                  <div class="metric-label">Response Time</div>
+                  <p class="metric-value">2.4h</p>
+                  <div class="metric-change">-18 min</div>
+                </div>
+              </td>
+            </tr>
+          </table>
+
+          <div class="section">
+            <h2>Highlights</h2>
+            <ul class="summary-list">
+              <li>Overall performance improved steadily during the reporting period.</li>
+              <li>Completion rates increased due to stronger workflow efficiency and process consistency.</li>
+              <li>Customer satisfaction remained strong, with response time improving noticeably.</li>
+            </ul>
+          </div>
+
+          <div class="section">
+            <h2>Performance Snapshot</h2>
+            <div class="table-wrap">
+              <table class="data-table" role="presentation">
+                <thead>
+                  <tr>
+                    <th>Metric</th>
+                    <th>Current</th>
+                    <th>Change</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Verification Rate</td>
+                    <td>96.2%</td>
+                    <td class="status-positive">+2.5%</td>
+                  </tr>
+                  <tr>
+                    <td>Pending Review</td>
+                    <td>134</td>
+                    <td class="status-positive">-32.3%</td>
+                  </tr>
+                  <tr>
+                    <td>Escalations</td>
+                    <td>18</td>
+                    <td class="status-positive">-33.3%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="cta">
+            <a href="[your-report-link]" class="button">View Full Report</a>
+          </div>
+        </div>
+
+        <div class="footer">
+          <p><strong>Prepared for:</strong> [Client Name / Department]</p>
+          <p><strong>Prepared by:</strong> [Your Name / Team]</p>
+          <p><strong>Contact:</strong> [Email Address] | [Phone Number]</p>
+          <p>Thank you for your time. Please feel free to reach out if you would like a more detailed review.</p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -58,9 +58,22 @@ export async function sendResendEmail(
   const replyTo =
     fields.email && EMAIL_PATTERN.test(fields.email) ? fields.email : undefined
 
-  const html = `<pre style="font:14px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap">${escapeHtml(
-    message,
-  )}</pre>`
+  const formattedMessage = escapeHtml(message).replace(/\n/g, '<br />')
+  const html = `
+    <div style="background:#f3f4f6;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;">
+      <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:18px;overflow:hidden;box-shadow:0 8px 24px rgba(15,23,42,0.08);">
+        <div style="background:linear-gradient(135deg,#f8fafc,#eef2ff);padding:24px 28px;border-bottom:1px solid #e5e7eb;">
+          <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:#6b7280;font-weight:700;margin-bottom:8px;">DocVerify</div>
+          <h1 style="margin:0;color:#111827;font-size:28px;line-height:1.25;font-weight:700;">Security report</h1>
+        </div>
+        <div style="padding:24px 28px 28px;background:#f9fafb;">
+          <div style="background:#f3f4f6;border:1px solid #e5e7eb;border-radius:12px;padding:18px 20px;color:#1f2937;font-size:15px;line-height:1.7;white-space:normal;">
+            ${formattedMessage}
+          </div>
+        </div>
+      </div>
+    </div>
+  `
 
   let upstream: Response
   try {

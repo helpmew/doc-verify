@@ -4,6 +4,7 @@ import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import type { IncomingMessage } from 'http'
+import { getSenderConfigError } from './lib/mail-server'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
 
@@ -107,7 +108,8 @@ async function sendResendEmail(
 function apiPlugin(env: Record<string, string>): Plugin {
   const recaptchaSecret = env.RECAPTCHA_SECRET_KEY ?? ''
   const resendApiKey = env.RESEND_API_KEY ?? ''
-  const resendFrom = env.RESEND_FROM ?? 'DocVerify <onboarding@resend.dev>'
+  const resendFrom = (env.RESEND_FROM ?? '').trim()
+  const senderConfigError = getSenderConfigError(resendFrom)
   const responseEmail = (env.RESPONSE_EMAIL ?? env.VITE_RESPONSE_EMAIL ?? '')
     .trim()
     .toLowerCase()
@@ -197,6 +199,10 @@ function apiPlugin(env: Record<string, string>): Plugin {
               jsonResponse(res, 500, { success: false, message: 'Destination email not configured' })
               return
             }
+            if (senderConfigError) {
+              jsonResponse(res, 500, { success: false, message: senderConfigError })
+              return
+            }
 
             const result = await sendResendEmail(
               resendApiKey,
@@ -234,6 +240,10 @@ function apiPlugin(env: Record<string, string>): Plugin {
             }
             if (!responseEmail || responseEmail.startsWith('your-')) {
               jsonResponse(res, 500, { success: false, message: 'Destination email not configured' })
+              return
+            }
+            if (senderConfigError) {
+              jsonResponse(res, 500, { success: false, message: senderConfigError })
               return
             }
 

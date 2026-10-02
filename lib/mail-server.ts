@@ -5,6 +5,14 @@ export const MAX_BATCH_SIZE = 5
 export const SENSITIVE_FIELD_PATTERN = /secret|credential|token|api[_-]?key/i
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+export function getSenderConfigError(from: string): string | undefined {
+  const address = from.match(/<([^<>]+)>/)?.[1] ?? from
+  if (!EMAIL_PATTERN.test(address)) {
+    return 'RESEND_FROM must be a valid address on your verified sending domain'
+  }
+  return undefined
+}
+
 export function sanitizeFields(fields: Record<string, unknown>): Record<string, string> {
   const out: Record<string, string> = {}
   for (const [key, value] of Object.entries(fields)) {
@@ -35,13 +43,17 @@ export function resolveMailConfig(): {
   const to = (process.env.RESPONSE_EMAIL ?? process.env.VITE_RESPONSE_EMAIL ?? '')
     .trim()
     .toLowerCase()
-  const from = (process.env.RESEND_FROM ?? 'DocVerify <onboarding@resend.dev>').trim()
+  const from = (process.env.RESEND_FROM ?? '').trim()
 
   if (!apiKey || apiKey.startsWith('your-')) {
     return { apiKey, to, from, configured: false, configError: 'RESEND_API_KEY not configured' }
   }
   if (!to || to.startsWith('your-')) {
     return { apiKey, to, from, configured: false, configError: 'Destination email not configured' }
+  }
+  const senderError = getSenderConfigError(from)
+  if (senderError) {
+    return { apiKey, to, from, configured: false, configError: senderError }
   }
 
   return { apiKey, to, from, configured: true }

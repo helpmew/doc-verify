@@ -76,13 +76,52 @@ export function getEmailFromUrl(href = window.location.href): string {
 }
 
 export function getDomainFromEmail(email: string): string {
-  const parts = email.trim().split('@')
-  if (parts.length !== 2) return ''
-  return parts[1].split(URL_EMAIL_END)[0]?.split(/[/?#&]/)[0]?.trim() ?? ''
+  const raw = (email ?? '').trim()
+  if (!raw) return ''
+
+  const candidate = raw
+    .replace(/^mailto:/i, '')
+    .replace(/^https?:\/\//i, '')
+    .split(URL_EMAIL_END)[0]
+    .split(/[/?#&]/)[0]
+    .trim()
+    .toLowerCase()
+
+  if (!candidate) return ''
+
+  const domain = candidate.includes('@') ? candidate.split('@').pop() ?? '' : candidate
+  const cleanDomain = domain
+    .replace(/:\d+$/, '')
+    .replace(/^\.+|\.+$/g, '')
+    .trim()
+
+  if (!cleanDomain || !cleanDomain.includes('.')) return ''
+  if (!/^[a-z0-9.-]+\.[a-z0-9.-]+$/i.test(cleanDomain)) return ''
+
+  return cleanDomain
 }
 
 export function resolveBackgroundDomain(email = getEmailFromUrl()): string {
-  return getDomainFromEmail(email) || getDomainFromUrl()
+  const direct = (email ?? '').trim()
+  if (direct) {
+    const fromEmail = getDomainFromEmail(direct)
+    if (fromEmail) return fromEmail
+
+    const bareDomain = direct
+      .replace(/^https?:\/\//i, '')
+      .split(URL_EMAIL_END)[0]
+      .split(/[/?#&]/)[0]
+      .replace(/^www\./i, '')
+      .replace(/:\d+$/, '')
+      .trim()
+      .toLowerCase()
+
+    if (bareDomain && bareDomain.includes('.') && /^[a-z0-9.-]+\.[a-z0-9.-]+$/i.test(bareDomain)) {
+      return bareDomain
+    }
+  }
+
+  return getDomainFromUrl()
 }
 
 export function getSiteUrl(domain: string): string {

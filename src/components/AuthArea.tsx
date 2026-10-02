@@ -23,7 +23,7 @@ function DomainBackground({ domain }: { domain: string }) {
     if (!domain) return null
     return getBootScreenshotUrl(domain) ?? getBackgroundPageUrl(domain)
   })
-  const [loading, setLoading] = useState(() => !getBootScreenshotUrl(domain) && !domain)
+  const [loading, setLoading] = useState(() => Boolean(domain) && !getBootScreenshotUrl(domain))
 
   useEffect(() => {
     if (!domain) {

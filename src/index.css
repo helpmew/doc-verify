@@ -27,20 +27,26 @@
 }
 
 html {
+  height: 100%;
   scroll-behavior: smooth;
+  background-color: var(--color-surface-muted);
+  background-position: center top;
+  background-size: cover;
+  background-repeat: no-repeat;
 }
 
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: 100%;
   font-family: var(--font-sans);
   color: var(--color-text);
-  background: var(--color-surface-muted);
+  background: transparent;
   -webkit-font-smoothing: antialiased;
 }
 
 #root {
-  min-height: 100vh;
+  min-height: 100%;
+  background: transparent;
 }
 
 @keyframes fade-in {

